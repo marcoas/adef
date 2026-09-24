@@ -16,9 +16,9 @@ El sistema **Álbum de Patentes** está construido siguiendo el patrón de arqui
 
 ---
 
-## 2. Lógica de Extracción de Patentes Argentinas
+## 2. Lógica de Extracción de Patentes
 
-El sistema reconoce dos tipos de patentes estándar en Argentina:
+El sistema reconoce dos tipos de patentes estándar:
 
 1. **Formato Antiguo (`AAA 000`):**
    - Expresión Regular: `/^([A-Z]{3})\s*(\d{3})$/i`

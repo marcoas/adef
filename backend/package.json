@@ -1,7 +1,7 @@
 {
   "name": "patentes-backend",
   "version": "1.0.0",
-  "description": "Backend API para el Álbum de Patentes de Argentina",
+  "description": "Backend API para el Álbum de Patentes",
   "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",

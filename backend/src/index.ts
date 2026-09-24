@@ -1,11 +1,11 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { createWorker } from 'tesseract.js';
-import { extractArgentinePlate } from './utils/plateExtractor';
+import { extractPlate } from './utils/plateExtractor';
 import { recognizePlateALPR } from './services/alprService';
 
 dotenv.config();
@@ -14,6 +14,21 @@ const prisma = new PrismaClient();
 const app = express();
 const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_patentes_2026_change_me';
+
+// Middleware: exige un JWT válido (Authorization: Bearer <token>) para
+// interactuar con el álbum (cargar / eliminar fotos) - Issue #6
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Debes iniciar sesión para interactuar con el álbum.' });
+  }
+  try {
+    jwt.verify(header.slice(7), JWT_SECRET);
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Sesión inválida o expirada. Inicia sesión nuevamente.' });
+  }
+}
 
 // Security & Middleware
 app.use(helmet());
@@ -45,7 +60,7 @@ async function getOrCreateDefaultAlbum() {
   if (!album) {
     album = await prisma.album.create({
       data: {
-        title: 'Álbum Familiar de Patentes Argentinas',
+        title: 'Álbum Familiar de Patentes',
         ownerId: user.id,
       },
       include: { stickers: true },
@@ -172,7 +187,7 @@ app.post('/api/plates/parse', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Se requiere el parámetro "text"' });
     }
 
-    const result = extractArgentinePlate(text);
+    const result = extractPlate(text);
     return res.json(result);
   } catch (error) {
     console.error('Error al procesar la patente:', error);
@@ -220,17 +235,17 @@ app.get('/api/album', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/api/album/stickers', async (req: Request, res: Response) => {
+app.post('/api/album/stickers', requireAuth, async (req: Request, res: Response) => {
   try {
     const { plateText, imageUrl } = req.body;
     if (!plateText) {
       return res.status(400).json({ error: 'Se requiere el texto de la patente' });
     }
 
-    const plateResult = extractArgentinePlate(plateText);
+    const plateResult = extractPlate(plateText);
     if (!plateResult.isValid || plateResult.slotNumber === null) {
       return res.status(422).json({
-        error: 'No se pudo extraer una patente argentina válida de 3 dígitos (ej: AAA 000 o AA 000 AA).',
+        error: 'No se pudo extraer una patente válida de 3 dígitos (ej: AAA 000 o AA 000 AA).',
         plateResult,
       });
     }
@@ -281,6 +296,44 @@ app.post('/api/album/stickers', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error al guardar figurita en DB:', error);
     return res.status(500).json({ error: 'Error al escribir en PostgreSQL' });
+  }
+});
+
+app.delete('/api/album/stickers/:slotNumber', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const slotNumber = parseInt(req.params.slotNumber, 10);
+    if (isNaN(slotNumber)) {
+      return res.status(400).json({ error: 'Número de casillero inválido' });
+    }
+
+    const { album } = await getOrCreateDefaultAlbum();
+
+    const existingSticker = await prisma.sticker.findUnique({
+      where: {
+        albumId_slotNumber: {
+          albumId: album.id,
+          slotNumber,
+        },
+      },
+    });
+
+    if (!existingSticker) {
+      return res.status(404).json({ error: `No se encontró la figurita en el casillero #${slotNumber}` });
+    }
+
+    await prisma.sticker.delete({
+      where: {
+        albumId_slotNumber: {
+          albumId: album.id,
+          slotNumber,
+        },
+      },
+    });
+
+    return res.json({ message: `Figurita #${slotNumber} eliminada con éxito.` });
+  } catch (error) {
+    console.error('Error al eliminar figurita:', error);
+    return res.status(500).json({ error: 'Error al eliminar figurita de PostgreSQL' });
   }
 });
 

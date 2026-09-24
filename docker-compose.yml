@@ -61,6 +61,7 @@ services:
       NODE_ENV: development
       NEXT_PUBLIC_API_URL: http://localhost:4000/api
       NEXT_PUBLIC_DEFAULT_LOCALE: es
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     depends_on:
       - backend
     volumes:

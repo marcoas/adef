@@ -8,10 +8,10 @@ declare global {
   interface Window {
     google?: {
       accounts: {
-        id: {
-          initialize: (config: any) => void;
-          prompt: (notification?: any) => void;
-          renderButton: (parent: HTMLElement, options: any) => void;
+        oauth2?: {
+          initTokenClient: (config: any) => {
+            requestAccessToken: (options?: { prompt?: string }) => void;
+          };
         };
       };
     };
@@ -36,74 +36,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const [activeProvider, setActiveProvider] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Inicializar Google Identity Services (GIS)
+  // Cargar el SDK de Google Identity Services (GIS) una sola vez al abrir el modal
   useEffect(() => {
     if (!isOpen) return;
-
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
-
-    const handleGoogleCredentialResponse = async (response: any) => {
-      setIsLoading(true);
-      setActiveProvider('google');
-      setErrorMessage(null);
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-        const res = await fetch(`${apiUrl}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            idToken: response.credential,
-            authProvider: 'google',
-          }),
-        });
-
-        if (!res.ok) {
-          throw new Error('Error al autenticar con el backend');
-        }
-
-        const data = await res.json();
-        if (data.token) {
-          localStorage.setItem('jwt_token', data.token);
-        }
-        if (data.user) {
-          localStorage.setItem('user_session', JSON.stringify(data.user));
-          onLoginSuccess(data.user);
-        }
-        onClose();
-      } catch (err: any) {
-        console.error('Error en autenticación Google:', err);
-        setErrorMessage(err.message || 'Error al verificar credenciales con el servidor');
-      } finally {
-        setIsLoading(false);
-        setActiveProvider(null);
-      }
-    };
-
-    const initGoogleAuth = () => {
-      if (window.google?.accounts?.id && clientId && clientId !== 'your_google_client_id_here.apps.googleusercontent.com') {
-        try {
-          window.google.accounts.id.initialize({
-            client_id: clientId,
-            callback: handleGoogleCredentialResponse,
-          });
-
-          const btnContainer = document.getElementById('google-btn-container');
-          if (btnContainer) {
-            btnContainer.innerHTML = '';
-            window.google.accounts.id.renderButton(btnContainer, {
-              type: 'standard',
-              theme: 'outline',
-              size: 'large',
-              text: 'continue_with',
-              shape: 'rectangular',
-              width: 320,
-            });
-          }
-        } catch (e) {
-          console.warn('Error iniciando SDK Google GIS:', e);
-        }
-      }
-    };
 
     if (!document.getElementById('google-jssdk')) {
       const script = document.createElement('script');
@@ -111,12 +46,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       script.src = 'https://accounts.google.com/gsi/client';
       script.async = true;
       script.defer = true;
-      script.onload = initGoogleAuth;
       document.body.appendChild(script);
-    } else {
-      initGoogleAuth();
     }
-  }, [isOpen, onClose, onLoginSuccess]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -127,15 +59,21 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
     if (provider === 'google') {
       const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
-      if (window.google?.accounts?.id && clientId && clientId !== 'your_google_client_id_here.apps.googleusercontent.com') {
-        window.google.accounts.id.prompt((notification: any) => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            executeOAuthBackendLogin('google', 'Usuario Google', 'usuario_google@patentes.ar');
-          }
-        });
+      if (!clientId || clientId === 'your_google_client_id_here.apps.googleusercontent.com') {
+        setIsLoading(false);
+        setActiveProvider(null);
+        setErrorMessage('Google OAuth no está configurado: falta NEXT_PUBLIC_GOOGLE_CLIENT_ID en el entorno del frontend.');
         return;
       }
-      await executeOAuthBackendLogin('google', 'Usuario Google', 'usuario_google@patentes.ar');
+      if (window.google?.accounts?.oauth2) {
+        // Popup real de Google con selector de cuenta (One Tap / prompt() no siempre se muestra)
+        openGoogleAccountChooser(clientId);
+        return;
+      }
+      setIsLoading(false);
+      setActiveProvider(null);
+      setErrorMessage('El SDK de Google aún se está cargando. Reintenta en unos segundos.');
+      return;
     } else if (provider === 'facebook') {
       // Flujo OAuth Facebook
       await executeOAuthBackendLogin('facebook', 'Usuario Facebook', 'usuario_facebook@patentes.ar');
@@ -145,7 +83,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
   };
 
-  const executeOAuthBackendLogin = async (provider: string, defaultName: string, defaultEmail: string) => {
+  const executeOAuthBackendLogin = async (
+    provider: string,
+    defaultName: string,
+    defaultEmail: string,
+    avatarOverride?: string,
+  ) => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
       const res = await fetch(`${apiUrl}/auth/login`, {
@@ -154,11 +97,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         body: JSON.stringify({
           email: defaultEmail,
           name: defaultName,
-          avatarUrl: provider === 'github' 
-            ? 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80'
-            : provider === 'facebook'
-            ? 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80'
-            : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+          avatarUrl: avatarOverride
+            || (provider === 'github'
+              ? 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80'
+              : provider === 'facebook'
+              ? 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80'
+              : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'),
           authProvider: provider,
         }),
       });
@@ -183,6 +127,45 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       setIsLoading(false);
       setActiveProvider(null);
     }
+  };
+
+  // Abre el popup real de Google con selector de cuenta (usando el SDK GIS ya cargado).
+  // Flujo: token de acceso -> userinfo -> login en el backend con email/name/avatar.
+  const openGoogleAccountChooser = (clientId: string) => {
+    const tokenClient = window.google!.accounts.oauth2!.initTokenClient({
+      client_id: clientId,
+      scope: 'openid email profile',
+      prompt: 'select_account',
+      callback: async (tokenResponse: any) => {
+        if (tokenResponse.error) {
+          setIsLoading(false);
+          setActiveProvider(null);
+          setErrorMessage(`Google devolvió un error: ${tokenResponse.error}`);
+          return;
+        }
+        try {
+          const profileRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+          });
+          if (!profileRes.ok) {
+            throw new Error('No se pudo obtener tu perfil de Google');
+          }
+          const profile = await profileRes.json();
+          await executeOAuthBackendLogin(
+            'google',
+            profile.name || profile.email,
+            profile.email,
+            profile.picture,
+          );
+        } catch (err: any) {
+          console.error('Error obteniendo perfil de Google:', err);
+          setErrorMessage(err.message || 'No se pudo obtener tu perfil de Google');
+          setIsLoading(false);
+          setActiveProvider(null);
+        }
+      },
+    });
+    tokenClient.requestAccessToken();
   };
 
   return (
@@ -222,8 +205,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
         {/* Botones de Proveedores OAuth Exclusivos */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '1rem' }}>
-          <div id="google-btn-container" style={{ display: 'flex', justifyContent: 'center' }}></div>
-
           {/* Google OAuth */}
           <button 
             type="button" 

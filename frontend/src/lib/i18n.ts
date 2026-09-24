@@ -8,7 +8,7 @@ export type Locale = 'es' | 'en';
 export const translations = {
   es: {
     appTitle: 'Álbum de Patentes',
-    appSubtitle: 'Colección de patentes argentinas (000 - 999)',
+    appSubtitle: 'Colección de patentes (000 - 999)',
     searchPlaceholder: 'Buscar casillero (ej: 042)...',
     filterAll: 'Todas (1000)',
     filterCollected: 'Pegadas',
@@ -35,7 +35,7 @@ export const translations = {
   },
   en: {
     appTitle: 'License Plate Album',
-    appSubtitle: 'Argentine license plate sticker collection (000 - 999)',
+    appSubtitle: 'License plate sticker collection (000 - 999)',
     searchPlaceholder: 'Search slot (e.g. 042)...',
     filterAll: 'All (1000)',
     filterCollected: 'Stuck',

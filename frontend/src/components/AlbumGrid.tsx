@@ -1,20 +1,29 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Search, Sparkles } from 'lucide-react';
+import { Search, Sparkles, Lock, BookOpen } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 import { StickerData } from './StickerModal';
+
+interface UserSession {
+  email: string;
+  name: string;
+  avatarUrl?: string;
+}
 
 interface AlbumGridProps {
   locale: Locale;
   stickers: Record<number, StickerData>;
   onSlotClick: (slotNumber: number) => void;
+  userSession: UserSession | null;
+  onOpenLogin: () => void;
 }
 
-export const AlbumGrid: React.FC<AlbumGridProps> = ({ locale, stickers, onSlotClick }) => {
+export const AlbumGrid: React.FC<AlbumGridProps> = ({ locale, stickers, onSlotClick, userSession, onOpenLogin }) => {
   const t = getTranslation(locale);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'collected' | 'missing'>('all');
+  const [selectedAlbum, setSelectedAlbum] = useState<'own' | 'shared'>('own');
 
   const TOTAL_SLOTS = 1000;
   const collectedCount = Object.keys(stickers).length;
@@ -47,8 +56,40 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({ locale, stickers, onSlotCl
 
   return (
     <div>
-      {/* Bar de Progreso */}
+      {/* Bar de Progreso & Selector de Álbumes */}
       <div className="toolbar-container">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <BookOpen size={20} style={{ color: 'var(--accent-cyan)' }} />
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Álbum Activo:</h2>
+            <select 
+              value={selectedAlbum} 
+              onChange={(e) => setSelectedAlbum(e.target.value as 'own' | 'shared')}
+              style={{
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--text-primary)',
+                padding: '0.4rem 0.8rem',
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="own" style={{ background: '#121827' }}>
+                {userSession ? `Álbum de ${userSession.name} (Propietario)` : 'Mi Álbum Principal'}
+              </option>
+              <option value="shared" style={{ background: '#121827' }}>Álbum Compartido (Familia & Asociados)</option>
+            </select>
+          </div>
+
+          {!userSession && (
+            <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-sm)', padding: '0.4rem 0.8rem', fontSize: '0.85rem', color: '#F87171', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Lock size={14} />
+              <span>Inicia sesión para ver las fotografías del álbum</span>
+            </div>
+          )}
+        </div>
+
         <div className="progress-card">
           <div className="progress-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -114,20 +155,39 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({ locale, stickers, onSlotCl
             <div 
               key={slot}
               className={`sticker-slot ${sticker ? 'collected' : ''}`}
-              onClick={() => onSlotClick(slot)}
-              title={sticker ? `Casillero #${formattedSlot}: ${sticker.rawPlate}` : `Casillero #${formattedSlot} Vacío`}
+              onClick={() => {
+                if (!userSession && sticker) {
+                  onOpenLogin();
+                } else {
+                  onSlotClick(slot);
+                }
+              }}
+              title={
+                !userSession && sticker 
+                  ? `Inicia sesión para ver la foto de #${formattedSlot}` 
+                  : sticker 
+                  ? `Casillero #${formattedSlot}: ${sticker.rawPlate}` 
+                  : `Casillero #${formattedSlot} Vacío`
+              }
             >
               {sticker ? (
-                <>
-                  <img 
-                    src={sticker.imageUrl} 
-                    alt={`Patente ${sticker.rawPlate}`} 
-                    className="sticker-image"
-                  />
-                  <div className="plate-badge">
-                    {sticker.rawPlate}
+                userSession ? (
+                  <>
+                    <img 
+                      src={sticker.imageUrl} 
+                      alt={`Patente ${sticker.rawPlate}`} 
+                      className="sticker-image"
+                    />
+                    <div className="plate-badge">
+                      {sticker.rawPlate}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--accent-cyan)' }}>
+                    <Lock size={20} />
+                    <span style={{ fontSize: '0.75rem', marginTop: '4px', fontWeight: 600 }}>#{formattedSlot}</span>
                   </div>
-                </>
+                )
               ) : (
                 <span className="slot-number">{formattedSlot}</span>
               )}

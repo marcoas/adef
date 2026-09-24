@@ -1,9 +1,9 @@
 /**
- * Utilidad Avanzada de Reconocimiento y Formateo de Patentes Argentinas.
+ * Utilidad Avanzada de Reconocimiento y Formateo de Patentes.
  * 
- * Formatos Oficiales en Argentina:
- * 1. Modelo Mercosur (AA 000 AA): 2 letras + 3 números + 2 letras (ej: AI 440 SA)
- * 2. Modelo Antiguo (AAA 000): 3 letras + 3 números (ej: ABC 123)
+ * Formatos Oficiales Soportados:
+ * 1. Modelo Estándar Mercosur (AA 000 AA): 2 letras + 3 números + 2 letras (ej: AI 440 SA)
+ * 2. Modelo Tradicional (AAA 000): 3 letras + 3 números (ej: ABC 123)
  */
 
 export interface PlateResult {
@@ -28,9 +28,9 @@ function normalizeText(text: string): string {
 }
 
 /**
- * Extrae y da formato completo a una patente de Argentina (Mercosur o Antiguo)
+ * Extrae y da formato completo a una patente de automóvil (Mercosur o Antiguo)
  */
-export function extractArgentinePlate(text: string): PlateResult {
+export function extractPlate(text: string): PlateResult {
   const normalized = normalizeText(text);
 
   // 1. Patrón Mercosur: 2 Letras + 3 Números + 2 Letras (ej: AI440SA -> AI 440 SA)
@@ -103,3 +103,5 @@ export function extractArgentinePlate(text: string): PlateResult {
     formattedSlot: null,
   };
 }
+
+

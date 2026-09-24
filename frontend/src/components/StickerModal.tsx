@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { X, Calendar, User, CheckCircle2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Calendar, User, CheckCircle2, Trash2 } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 
 export interface StickerData {
@@ -19,6 +19,8 @@ interface StickerModalProps {
   onClose: () => void;
   locale: Locale;
   onOpenUploadForSlot: (slot: number) => void;
+  onStickerDeleted?: (slotNumber: number) => void;
+  isOwner?: boolean;
 }
 
 export const StickerModal: React.FC<StickerModalProps> = ({
@@ -28,6 +30,8 @@ export const StickerModal: React.FC<StickerModalProps> = ({
   onClose,
   locale,
   onOpenUploadForSlot,
+  onStickerDeleted,
+  isOwner = true,
 }) => {
   const t = getTranslation(locale);
 
@@ -95,9 +99,48 @@ export const StickerModal: React.FC<StickerModalProps> = ({
               </div>
             </div>
 
-            <button className="btn-secondary" onClick={onClose} style={{ width: '100%', justifyContent: 'center' }}>
-              {t.close}
-            </button>
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+              {onStickerDeleted && isOwner && (
+                <button 
+                  className="btn-secondary" 
+                  onClick={async () => {
+                    if (confirm(`¿Estás seguro de que deseas eliminar la foto del casillero #${formattedSlot}?`)) {
+                      try {
+                        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+                        const jwtToken = localStorage.getItem('jwt_token');
+                        const res = await fetch(`${apiUrl}/album/stickers/${slotNumber}`, {
+                          method: 'DELETE',
+                          headers: jwtToken ? { Authorization: `Bearer ${jwtToken}` } : {},
+                        });
+                        if (res.status === 401) {
+                          alert('Tu sesión expiró o no es válida. Inicia sesión nuevamente.');
+                          return;
+                        }
+                      } catch (err) {
+                        console.error('Error al eliminar figurita:', err);
+                      }
+                      onStickerDeleted(slotNumber);
+                      onClose();
+                    }
+                  }}
+                  style={{ 
+                    color: '#EF4444', 
+                    borderColor: 'rgba(239, 68, 68, 0.3)', 
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    gap: '0.4rem',
+                    flex: 1,
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Trash2 size={16} />
+                  <span>Eliminar Foto</span>
+                </button>
+              )}
+
+              <button className="btn-secondary" onClick={onClose} style={{ flex: 1, justifyContent: 'center' }}>
+                {t.close}
+              </button>
+            </div>
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: '1rem 0' }}>

@@ -9,6 +9,7 @@ interface UploadModalProps {
   onClose: () => void;
   locale: Locale;
   onStickerAdded: (slotNumber: number, rawPlate: string, imageUrl: string) => void;
+  targetSlot?: number | null;
 }
 
 export const UploadModal: React.FC<UploadModalProps> = ({
@@ -16,6 +17,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   onClose,
   locale,
   onStickerAdded,
+  targetSlot = null,
 }) => {
   const t = getTranslation(locale);
   const [plateInput, setPlateInput] = useState('');
@@ -210,18 +212,40 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     }
 
     const slotNumber = parseInt(digitMatch[0], 10);
+
+    // Validación según el Issue #4: si viene de un casillero específico, la patente leída debe coincidir
+    if (targetSlot !== null && targetSlot !== undefined && slotNumber !== targetSlot) {
+      const formattedTarget = targetSlot.toString().padStart(3, '0');
+      setErrorMsg(`La patente ingresada/leída (#${digitMatch[0]}) no corresponde al casillero #${formattedTarget} seleccionado. Carga anulada.`);
+      return;
+    }
     const mockImage = imagePreview || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=500&auto=format&fit=crop&q=60';
+
+    // Issue #6: exige sesión previa para cargar fotos (también validado en backend)
+    const jwtToken = localStorage.getItem('jwt_token');
+    if (!jwtToken) {
+      setErrorMsg('Debes iniciar sesión antes de cargar fotos al álbum.');
+      return;
+    }
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
       const response = await fetch(`${apiUrl}/album/stickers`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${jwtToken}`,
+        },
         body: JSON.stringify({
           plateText: plateInput,
           imageUrl: mockImage,
         }),
       });
+
+      if (response.status === 401) {
+        setErrorMsg('Tu sesión expiró o no es válida. Inicia sesión nuevamente para cargar fotos.');
+        return;
+      }
 
       if (response.status === 409) {
         const errData = await response.json();

@@ -1,16 +1,16 @@
 import { createWorker } from 'tesseract.js';
-import { extractArgentinePlate, PlateResult } from '../utils/plateExtractor';
+import { extractPlate, PlateResult } from '../utils/plateExtractor';
 
 /**
  * Servicio de Reconocimiento de Patentes ALPR (Automatic License Plate Recognition)
  * 
- * 1. Intenta consulta a Plate Recognizer API (IA especializada en patentes de Argentina).
+ * 1. Intenta consulta a Plate Recognizer API (IA especializada en patentes).
  * 2. Si no hay Token o falla la conexión, realiza fallback automático a Tesseract OCR Local.
  */
 export async function recognizePlateALPR(imageBase64: string): Promise<{ ocrText: string; plateResult: PlateResult; provider: string }> {
   const PLATE_RECOGNIZER_TOKEN = process.env.PLATE_RECOGNIZER_TOKEN;
 
-  // Estrategia 1: Plate Recognizer Cloud Service (100% Gratuito y especializado en patentes argentinas)
+  // Estrategia 1: Plate Recognizer Cloud Service (100% Gratuito y especializado en patentes)
   if (PLATE_RECOGNIZER_TOKEN && PLATE_RECOGNIZER_TOKEN.trim() !== '' && PLATE_RECOGNIZER_TOKEN !== '123456') {
     try {
       console.log('🌐 Ejecutando ALPR vía Plate Recognizer Cloud API...');
@@ -28,7 +28,6 @@ export async function recognizePlateALPR(imageBase64: string): Promise<{ ocrText
         },
         body: JSON.stringify({
           upload: formattedBase64,
-          regions: ['ar'], // Región Argentina
         }),
       });
 
@@ -40,7 +39,7 @@ export async function recognizePlateALPR(imageBase64: string): Promise<{ ocrText
           const detectedPlate = data.results[0].plate.toUpperCase();
           console.log(`🎯 Plate Recognizer detectó patente: "${detectedPlate}" con confianza ${data.results[0].score}`);
 
-          const plateResult = extractArgentinePlate(detectedPlate);
+          const plateResult = extractPlate(detectedPlate);
           return {
             ocrText: detectedPlate,
             plateResult,
@@ -71,10 +70,11 @@ export async function recognizePlateALPR(imageBase64: string): Promise<{ ocrText
   const { data: { text } } = await worker.recognize(imageBase64);
   await worker.terminate();
 
-  const plateResult = extractArgentinePlate(text);
+  const plateResult = extractPlate(text);
   return {
     ocrText: text.trim(),
     plateResult,
     provider: 'Tesseract OCR Local',
   };
 }
+

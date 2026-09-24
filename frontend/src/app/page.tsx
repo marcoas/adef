@@ -19,6 +19,7 @@ export default function HomePage() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+  const [uploadTargetSlot, setUploadTargetSlot] = useState<number | null>(null);
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [stickers, setStickers] = useState<Record<number, StickerData>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -69,6 +70,15 @@ export default function HomePage() {
     fetchAlbumFromPostgreSQL();
   };
 
+  const handleStickerDeleted = (slotNumber: number) => {
+    setStickers((prev) => {
+      const updated = { ...prev };
+      delete updated[slotNumber];
+      return updated;
+    });
+    fetchAlbumFromPostgreSQL();
+  };
+
   const handleLoginSuccess = (user: UserSession) => {
     setUserSession(user);
     fetchAlbumFromPostgreSQL();
@@ -80,13 +90,22 @@ export default function HomePage() {
     setUserSession(null);
   };
 
+  // Issue #6: sin login previo no se puede interactuar con el álbum (cargar fotos)
+  const handleOpenUpload = () => {
+    if (!userSession) {
+      setIsLoginOpen(true);
+      return;
+    }
+    setIsUploadOpen(true);
+  };
+
   return (
     <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Header Principal con Auth */}
       <Header 
         locale={locale} 
         setLocale={setLocale} 
-        onOpenUpload={() => setIsUploadOpen(true)}
+        onOpenUpload={handleOpenUpload}
         onOpenLogin={() => setIsLoginOpen(true)}
         onLogout={handleLogout}
         userSession={userSession}
@@ -97,14 +116,20 @@ export default function HomePage() {
         locale={locale}
         stickers={stickers}
         onSlotClick={(slot) => setSelectedSlot(slot)}
+        userSession={userSession}
+        onOpenLogin={() => setIsLoginOpen(true)}
       />
 
       {/* Modal de Captura de Fotos / OCR Real */}
       <UploadModal 
         isOpen={isUploadOpen}
-        onClose={() => setIsUploadOpen(false)}
+        onClose={() => {
+          setIsUploadOpen(false);
+          setUploadTargetSlot(null);
+        }}
         locale={locale}
         onStickerAdded={handleStickerAdded}
+        targetSlot={uploadTargetSlot}
       />
 
       {/* Modal Detalle de Casillero / Figurita */}
@@ -114,10 +139,17 @@ export default function HomePage() {
         isOpen={selectedSlot !== null}
         onClose={() => setSelectedSlot(null)}
         locale={locale}
-        onOpenUploadForSlot={() => {
+        onOpenUploadForSlot={(slot) => {
           setSelectedSlot(null);
+          if (!userSession) {
+            setIsLoginOpen(true);
+            return;
+          }
+          setUploadTargetSlot(slot);
           setIsUploadOpen(true);
         }}
+        onStickerDeleted={handleStickerDeleted}
+        isOwner={!!userSession}
       />
 
       {/* Modal de Inicio de Sesión OAuth / Email */}

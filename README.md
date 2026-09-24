@@ -1,13 +1,13 @@
-# 🚗 Álbum de Patentes de Argentina
+# 🚗 Álbum de Patentes
 
-Webapp lúdica y familiar (responsive mobile y desktop) inspirada en el concepto de llenar un álbum de figuritas, basada en la colección y registro fotográfico de patentes de automóviles en Argentina.
+Webapp lúdica y familiar (responsive mobile y desktop) inspirada en el concepto de llenar un álbum de figuritas, basada en la colección y registro fotográfico de patentes de automóviles.
 
 ---
 
 ## 📌 Características Principales
 
 - **Álbum de 1000 Figuritas (000 al 999):** Cada usuario posee un álbum digital con 1000 casilleros basados en los 3 últimos dígitos numéricos de las patentes.
-- **Formato de Patentes Soportados (Argentina):**
+- **Formato de Patentes Soportados:**
   - Modelo Antiguo: `AAA 000` (Ejemplo: `ABC 123` ➔ Casillero **123**).
   - Modelo Vigente (Mercosur): `AA 000 AA` (Ejemplo: `AE 789 CD` ➔ Casillero **789**).
 - **Escaneo con OCR (Reconocimiento Automático):** Procesa imágenes de patentes y ubica automáticamente la figurita en el casillero correspondiente.

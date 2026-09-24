@@ -53,30 +53,21 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {userSession ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div 
-                className="btn-secondary" 
-                style={{ borderColor: 'rgba(16, 185, 129, 0.4)', background: 'rgba(16, 185, 129, 0.1)', cursor: 'default' }}
+            <div style={{ position: 'relative' }}>
+              <button 
+                className="btn-secondary"
+                onClick={onLogout}
+                title={`Conectado como ${userSession.name}. Haz clic para cerrar sesión.`}
+                style={{
+                  borderColor: 'rgba(16, 185, 129, 0.4)',
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  gap: '0.5rem',
+                }}
               >
                 <UserCheck size={18} style={{ color: 'var(--accent-emerald)' }} />
                 <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{userSession.name}</span>
-              </div>
-              {onLogout && (
-                <button 
-                  className="btn-secondary" 
-                  onClick={onLogout}
-                  title="Cerrar Sesión"
-                  style={{ 
-                    color: '#EF4444', 
-                    borderColor: 'rgba(239, 68, 68, 0.3)', 
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    gap: '0.4rem'
-                  }}
-                >
-                  <LogOut size={16} />
-                  <span>Cerrar Sesión</span>
-                </button>
-              )}
+                <LogOut size={16} style={{ color: '#EF4444', marginLeft: '0.25rem' }} />
+              </button>
             </div>
           ) : (
             <button className="btn-secondary" onClick={onOpenLogin}>
