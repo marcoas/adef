@@ -76,12 +76,23 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          <button className="btn-secondary">
+          {/* Issue #7: acciones que requieren sesión se muestran grisadas sin login */}
+          <button
+            className="btn-secondary"
+            onClick={userSession ? undefined : onOpenLogin}
+            title={userSession ? undefined : 'Inicia sesión para invitar a un asociado'}
+            style={!userSession ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+          >
             <Users size={18} />
             <span>{t.invitePartner}</span>
           </button>
 
-          <button className="btn-primary" onClick={onOpenUpload}>
+          <button
+            className="btn-primary"
+            onClick={onOpenUpload}
+            title={userSession ? undefined : 'Inicia sesión para capturar una patente'}
+            style={!userSession ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+          >
             <Camera size={18} />
             <span>{t.uploadButton}</span>
           </button>

@@ -31,3 +31,4 @@ postgres_data/
 Thumbs.db
 .vscode/
 .idea/
+.playwright-mcp

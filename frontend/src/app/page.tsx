@@ -52,8 +52,19 @@ export default function HomePage() {
         console.error('Error parseando user_session de localStorage:', e);
       }
     }
-    fetchAlbumFromPostgreSQL();
   }, []);
+
+  // Issue #7: sin sesión no se conoce "el álbum del usuario", por lo que no se
+  // consulta ni se conserva ningún dato (progreso, candados, filtros) y se limpia
+  // todo el estado en el logout.
+  useEffect(() => {
+    if (userSession) {
+      fetchAlbumFromPostgreSQL();
+    } else {
+      setStickers({});
+      setIsLoading(false);
+    }
+  }, [userSession]);
 
   const handleStickerAdded = (slotNumber: number, rawPlate: string, imageUrl: string) => {
     setStickers((prev) => ({
@@ -81,13 +92,14 @@ export default function HomePage() {
 
   const handleLoginSuccess = (user: UserSession) => {
     setUserSession(user);
-    fetchAlbumFromPostgreSQL();
+    // El fetch del álbum lo dispara el effect que observa `userSession`
   };
 
   const handleLogout = () => {
     localStorage.removeItem('user_session');
     localStorage.removeItem('jwt_token');
     setUserSession(null);
+    // Issue #7: al cerrar sesión se limpian stickers (progreso/candados) en el effect
   };
 
   // Issue #6: sin login previo no se puede interactuar con el álbum (cargar fotos)

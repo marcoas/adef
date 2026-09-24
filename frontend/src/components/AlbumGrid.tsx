@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Sparkles, Lock, BookOpen } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 import { StickerData } from './StickerModal';
@@ -25,9 +25,24 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({ locale, stickers, onSlotCl
   const [filterType, setFilterType] = useState<'all' | 'collected' | 'missing'>('all');
   const [selectedAlbum, setSelectedAlbum] = useState<'own' | 'shared'>('own');
 
+  // Issue #7: sin sesión no existe "el álbum del usuario"; se limpian los filtros
+  // locales (búsqueda, filtro, álbum seleccionado) al cerrar sesión.
+  useEffect(() => {
+    if (!userSession) {
+      setSearchTerm('');
+      setFilterType('all');
+      setSelectedAlbum('own');
+    }
+  }, [userSession]);
+
   const TOTAL_SLOTS = 1000;
   const collectedCount = Object.keys(stickers).length;
   const progressPercentage = ((collectedCount / TOTAL_SLOTS) * 100).toFixed(1);
+
+  // Issue #7: el combo de álbum solo se llena con invitaciones a colaborar.
+  // Todavía no existe API de invitaciones, por lo que cada usuario solo
+  // accede a su propio álbum (la opción compartida permanece oculta).
+  const hasSharedInvitation = false;
 
   // Generar array de 000 a 999
   const slots = useMemo(() => {
@@ -65,6 +80,8 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({ locale, stickers, onSlotCl
             <select 
               value={selectedAlbum} 
               onChange={(e) => setSelectedAlbum(e.target.value as 'own' | 'shared')}
+              disabled={!userSession}
+              title={userSession ? undefined : 'Inicia sesión para ver tus álbumes'}
               style={{
                 background: 'rgba(255,255,255,0.08)',
                 border: '1px solid var(--border-color)',
@@ -72,13 +89,17 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({ locale, stickers, onSlotCl
                 color: 'var(--text-primary)',
                 padding: '0.4rem 0.8rem',
                 fontSize: '0.9rem',
-                cursor: 'pointer',
+                cursor: userSession ? 'pointer' : 'not-allowed',
+                opacity: userSession ? 1 : 0.45,
               }}
             >
               <option value="own" style={{ background: '#121827' }}>
                 {userSession ? `Álbum de ${userSession.name} (Propietario)` : 'Mi Álbum Principal'}
               </option>
-              <option value="shared" style={{ background: '#121827' }}>Álbum Compartido (Familia & Asociados)</option>
+              {/* Issue #7: solo se muestra el álbum compartido si existe invitación */}
+              {hasSharedInvitation && (
+                <option value="shared" style={{ background: '#121827' }}>Álbum Compartido (Familia & Asociados)</option>
+              )}
             </select>
           </div>
 
@@ -90,27 +111,34 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({ locale, stickers, onSlotCl
           )}
         </div>
 
-        <div className="progress-card">
+        {/* Issue #7: sin sesión no se conoce el progreso del usuario (valores limpiados en logout) */}
+        <div className="progress-card" style={{ opacity: userSession ? 1 : 0.45 }}>
           <div className="progress-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Sparkles size={18} style={{ color: 'var(--accent-cyan)' }} />
               <span style={{ fontWeight: 700 }}>{t.progressTitle}</span>
             </div>
             <div style={{ fontFamily: 'Space Mono', fontWeight: 700 }}>
-              <span style={{ color: 'var(--accent-cyan)' }}>{collectedCount}</span> / {TOTAL_SLOTS} ({progressPercentage}%)
+              {userSession ? (
+                <>
+                  <span style={{ color: 'var(--accent-cyan)' }}>{collectedCount}</span> / {TOTAL_SLOTS} ({progressPercentage}%)
+                </>
+              ) : (
+                'Inicia sesión para ver tu progreso'
+              )}
             </div>
           </div>
           
           <div className="progress-bar-bg">
             <div 
               className="progress-bar-fill" 
-              style={{ width: `${progressPercentage}%` }} 
+              style={{ width: userSession ? `${progressPercentage}%` : '0%' }} 
             />
           </div>
         </div>
 
         {/* Buscador y Filtros */}
-        <div className="controls-row">
+        <div className="controls-row" style={{ opacity: userSession ? 1 : 0.45 }}>
           <div className="search-input-wrapper">
             <Search size={18} className="search-icon" />
             <input 
@@ -119,6 +147,8 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({ locale, stickers, onSlotCl
               placeholder={t.searchPlaceholder}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              disabled={!userSession}
+              title={userSession ? undefined : 'Inicia sesión para buscar en tu álbum'}
             />
           </div>
 
@@ -126,20 +156,26 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({ locale, stickers, onSlotCl
             <button 
               className={`filter-pill ${filterType === 'all' ? 'active' : ''}`}
               onClick={() => setFilterType('all')}
+              disabled={!userSession}
+              title={userSession ? undefined : 'Inicia sesión para filtrar tu álbum'}
             >
               {t.filterAll}
             </button>
             <button 
               className={`filter-pill ${filterType === 'collected' ? 'active' : ''}`}
               onClick={() => setFilterType('collected')}
+              disabled={!userSession}
+              title={userSession ? undefined : 'Inicia sesión para filtrar tu álbum'}
             >
-              {t.filterCollected} ({collectedCount})
+              {t.filterCollected} ({userSession ? collectedCount : 0})
             </button>
             <button 
               className={`filter-pill ${filterType === 'missing' ? 'active' : ''}`}
               onClick={() => setFilterType('missing')}
+              disabled={!userSession}
+              title={userSession ? undefined : 'Inicia sesión para filtrar tu álbum'}
             >
-              {t.filterMissing} ({TOTAL_SLOTS - collectedCount})
+              {t.filterMissing} ({userSession ? TOTAL_SLOTS - collectedCount : TOTAL_SLOTS})
             </button>
           </div>
         </div>
