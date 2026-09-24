@@ -29,6 +29,8 @@ model User {
   ownedAlbums   Album[]        @relation("AlbumOwner")
   memberships   AlbumMember[]
   stickers      Sticker[]
+  createdInvites AlbumInvite[] @relation("InviteCreator")
+  usedInvites    AlbumInvite[] @relation("InviteRedeemer")
 
   @@map("users")
 }
@@ -42,6 +44,7 @@ model Album {
   owner       User          @relation("AlbumOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   members     AlbumMember[]
   stickers    Sticker[]
+  invites     AlbumInvite[]
 
   @@map("albums")
 }
@@ -60,12 +63,32 @@ model AlbumMember {
   @@map("album_members")
 }
 
+// Issue #12: links de invitación de un solo uso por álbum
+model AlbumInvite {
+  id          String    @id @default(uuid())
+  token       String    @unique
+  albumId     String    @map("album_id")
+  createdById String    @map("created_by_id")
+  expiresAt   DateTime  @map("expires_at")
+  usedAt      DateTime? @map("used_at")
+  usedById    String?   @map("used_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  album     Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  createdBy User  @relation("InviteCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  usedBy    User? @relation("InviteRedeemer", fields: [usedById], references: [id], onDelete: SetNull)
+
+  @@index([albumId])
+  @@map("album_invites")
+}
+
 model Sticker {
   id               String   @id @default(uuid())
   albumId          String   @map("album_id")
   slotNumber       Int      @map("slot_number") // Casillero 0 al 999
   rawPlate         String   @map("raw_plate")   // Formato leído (ej: AB 123 CD)
-  imageUrl         String   @map("image_url")   // URL en Cloudinary o local
+  imageUrl         String   @map("image_url")   // URL en disco local, Cloudinary o remota
+  thumbnailUrl     String?  @map("thumbnail_url") // Issue #11: miniatura liviana para la grilla
   uploadedByUserId String   @map("uploaded_by_user_id")
   capturedAt       DateTime @default(now()) @map("captured_at")
 

@@ -5,6 +5,12 @@ import { Search, Sparkles, Lock, BookOpen } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 import { StickerData } from './StickerModal';
 
+export interface AlbumOption {
+  id: string;
+  title: string;
+  role: 'OWNER' | 'ASSOCIATE';
+}
+
 interface UserSession {
   email: string;
   name: string;
@@ -17,9 +23,22 @@ interface AlbumGridProps {
   onSlotClick: (slotNumber: number) => void;
   userSession: UserSession | null;
   onOpenLogin: () => void;
+  // Issue #12: álbumes propios + compartidos (invitaciones aceptadas)
+  albums?: AlbumOption[];
+  activeAlbumId?: string | null;
+  onChangeAlbum?: (albumId: string) => void;
 }
 
-export const AlbumGrid: React.FC<AlbumGridProps> = ({ locale, stickers, onSlotClick, userSession, onOpenLogin }) => {
+export const AlbumGrid: React.FC<AlbumGridProps> = ({
+  locale,
+  stickers,
+  onSlotClick,
+  userSession,
+  onOpenLogin,
+  albums = [],
+  activeAlbumId = null,
+  onChangeAlbum,
+}) => {
   const t = getTranslation(locale);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'collected' | 'missing'>('all');
@@ -38,11 +57,6 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({ locale, stickers, onSlotCl
   const TOTAL_SLOTS = 1000;
   const collectedCount = Object.keys(stickers).length;
   const progressPercentage = ((collectedCount / TOTAL_SLOTS) * 100).toFixed(1);
-
-  // Issue #7: el combo de álbum solo se llena con invitaciones a colaborar.
-  // Todavía no existe API de invitaciones, por lo que cada usuario solo
-  // accede a su propio álbum (la opción compartida permanece oculta).
-  const hasSharedInvitation = false;
 
   // Generar array de 000 a 999
   const slots = useMemo(() => {
@@ -78,8 +92,18 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({ locale, stickers, onSlotCl
             <BookOpen size={20} style={{ color: 'var(--accent-cyan)' }} />
             <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Álbum Activo:</h2>
             <select 
-              value={selectedAlbum} 
-              onChange={(e) => setSelectedAlbum(e.target.value as 'own' | 'shared')}
+              value={activeAlbumId || 'own'} 
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === 'own') {
+                  setSelectedAlbum('own');
+                  const own = albums.find((a) => a.role === 'OWNER');
+                  if (own && onChangeAlbum) onChangeAlbum(own.id);
+                } else {
+                  setSelectedAlbum('shared');
+                  if (onChangeAlbum) onChangeAlbum(value);
+                }
+              }}
               disabled={!userSession}
               title={userSession ? undefined : 'Inicia sesión para ver tus álbumes'}
               style={{
@@ -96,10 +120,14 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({ locale, stickers, onSlotCl
               <option value="own" style={{ background: '#121827' }}>
                 {userSession ? `Álbum de ${userSession.name} (Propietario)` : 'Mi Álbum Principal'}
               </option>
-              {/* Issue #7: solo se muestra el álbum compartido si existe invitación */}
-              {hasSharedInvitation && (
-                <option value="shared" style={{ background: '#121827' }}>Álbum Compartido (Familia & Asociados)</option>
-              )}
+              {/* Issue #12: un álbum compartido por cada invitación aceptada */}
+              {albums
+                .filter((a) => a.role === 'ASSOCIATE')
+                .map((a) => (
+                  <option key={a.id} value={a.id} style={{ background: '#121827' }}>
+                    {a.title} (Invitado)
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -209,10 +237,14 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({ locale, stickers, onSlotCl
               {sticker ? (
                 userSession ? (
                   <>
+                    {/* Issue #11: miniatura liviana + carga diferida para no
+                        bloquear la grilla cuando el álbum tiene muchas fotos */}
                     <img 
-                      src={sticker.imageUrl} 
+                      src={sticker.thumbnailUrl || sticker.imageUrl} 
                       alt={`Patente ${sticker.rawPlate}`} 
                       className="sticker-image"
+                      loading="lazy"
+                      decoding="async"
                     />
                     <div className="plate-badge">
                       {sticker.rawPlate}

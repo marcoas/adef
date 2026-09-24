@@ -15,6 +15,7 @@ interface HeaderProps {
   setLocale: (lang: Locale) => void;
   onOpenUpload: () => void;
   onOpenLogin: () => void;
+  onOpenInvite?: () => void;
   onLogout?: () => void;
   userSession: UserSession | null;
 }
@@ -24,6 +25,7 @@ export const Header: React.FC<HeaderProps> = ({
   setLocale,
   onOpenUpload,
   onOpenLogin,
+  onOpenInvite = () => {},
   onLogout,
   userSession,
 }) => {
@@ -76,10 +78,11 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* Issue #7: acciones que requieren sesión se muestran grisadas sin login */}
+          {/* Issue #7: acciones que requieren sesión se muestran grisadas sin login.
+              Issue #12: con sesión abre el generador de links de invitación. */}
           <button
             className="btn-secondary"
-            onClick={userSession ? undefined : onOpenLogin}
+            onClick={userSession ? onOpenInvite : onOpenLogin}
             title={userSession ? undefined : 'Inicia sesión para invitar a un asociado'}
             style={!userSession ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
           >

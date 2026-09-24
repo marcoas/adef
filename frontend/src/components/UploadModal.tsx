@@ -10,6 +10,8 @@ interface UploadModalProps {
   locale: Locale;
   onStickerAdded: (slotNumber: number, rawPlate: string, imageUrl: string) => void;
   targetSlot?: number | null;
+  // Issue #12: álbum destino (compartido) al que se sube la figurita
+  albumId?: string | null;
 }
 
 export const UploadModal: React.FC<UploadModalProps> = ({
@@ -18,6 +20,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   locale,
   onStickerAdded,
   targetSlot = null,
+  albumId = null,
 }) => {
   const t = getTranslation(locale);
   const [plateInput, setPlateInput] = useState('');
@@ -30,6 +33,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   // Centro del recuadro de recorte (porcentaje X, Y de la imagen)
   const [cropCenter, setCropCenter] = useState({ x: 50, y: 55, width: 45, height: 25 });
   const imageRef = useRef<HTMLImageElement | null>(null);
+
+  // Issue #10: solo se aceptan imágenes JPG o PNG y de hasta 5 MB
+  const MAX_FILE_SIZE_MB = 5;
+  const ALLOWED_TYPES = ['image/jpeg', 'image/png'];
 
   if (!isOpen) return null;
 
@@ -143,6 +150,21 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Issue #10: validar tipo (JPG/PNG) y tamaño antes de procesar
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setErrorMsg('Formato no permitido. Solo se aceptan imágenes JPG o PNG.');
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      setErrorMsg(`La imagen supera el tamaño máximo permitido (${MAX_FILE_SIZE_MB} MB).`);
+      e.target.value = '';
+      return;
+    }
+
+    setErrorMsg(null);
+
     const reader = new FileReader();
     reader.onload = async () => {
       const base64Data = reader.result as string;
@@ -230,7 +252,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-      const response = await fetch(`${apiUrl}/album/stickers`, {
+      // Issue #12: si se está viendo un álbum compartido, la figurita va a ese álbum
+      const stickerUrl = albumId ? `${apiUrl}/album/stickers?albumId=${albumId}` : `${apiUrl}/album/stickers`;
+      const response = await fetch(stickerUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -420,9 +444,12 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                   <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
                     Haz clic para seleccionar o tomar foto de la patente
                   </p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Formatos: JPG o PNG · Máximo {MAX_FILE_SIZE_MB} MB
+                  </p>
                   <input 
                     type="file" 
-                    accept="image/*" 
+                    accept="image/jpeg,image/png" 
                     onChange={handleImageUpload} 
                     style={{ display: 'none' }} 
                   />

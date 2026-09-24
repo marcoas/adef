@@ -8,6 +8,7 @@ export interface StickerData {
   slotNumber: number;
   rawPlate: string;
   imageUrl: string;
+  thumbnailUrl?: string | null;
   capturedAt: string;
   capturedBy?: string;
 }
@@ -21,6 +22,8 @@ interface StickerModalProps {
   onOpenUploadForSlot: (slot: number) => void;
   onStickerDeleted?: (slotNumber: number) => void;
   isOwner?: boolean;
+  // Issue #12: álbum activo (compartido) para eliminar figuritas
+  albumId?: string | null;
 }
 
 export const StickerModal: React.FC<StickerModalProps> = ({
@@ -32,6 +35,7 @@ export const StickerModal: React.FC<StickerModalProps> = ({
   onOpenUploadForSlot,
   onStickerDeleted,
   isOwner = true,
+  albumId = null,
 }) => {
   const t = getTranslation(locale);
 
@@ -108,12 +112,20 @@ export const StickerModal: React.FC<StickerModalProps> = ({
                       try {
                         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
                         const jwtToken = localStorage.getItem('jwt_token');
-                        const res = await fetch(`${apiUrl}/album/stickers/${slotNumber}`, {
-                          method: 'DELETE',
-                          headers: jwtToken ? { Authorization: `Bearer ${jwtToken}` } : {},
-                        });
+                        const res = await fetch(
+                          // Issue #12: indicar el álbum cuando es un álbum compartido
+                          `${apiUrl}/album/stickers/${slotNumber}${albumId ? `?albumId=${albumId}` : ''}`,
+                          {
+                            method: 'DELETE',
+                            headers: jwtToken ? { Authorization: `Bearer ${jwtToken}` } : {},
+                          }
+                        );
                         if (res.status === 401) {
                           alert('Tu sesión expiró o no es válida. Inicia sesión nuevamente.');
+                          return;
+                        }
+                        if (res.status === 403) {
+                          alert('Solo el dueño del álbum puede eliminar figuritas.');
                           return;
                         }
                       } catch (err) {

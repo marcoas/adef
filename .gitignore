@@ -27,6 +27,9 @@ logs/
 # Database data volume
 postgres_data/
 
+# Imágenes almacenadas por el backend (Issue #11)
+backend/uploads/
+
 # OS and IDE files
 .DS_Store
 Thumbs.db
