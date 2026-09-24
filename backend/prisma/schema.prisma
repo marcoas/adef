@@ -1,0 +1,77 @@
+// -------------------------------------------------------------
+// Esquema Prisma DB: Álbum de Patentes
+// Compatible con PostgreSQL (Local Docker, Supabase, Neon)
+// -------------------------------------------------------------
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  OWNER
+  ASSOCIATE
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  name          String
+  avatarUrl     String?        @map("avatar_url")
+  authProvider  String         @default("google") @map("auth_provider")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  ownedAlbums   Album[]        @relation("AlbumOwner")
+  memberships   AlbumMember[]
+  stickers      Sticker[]
+
+  @@map("users")
+}
+
+model Album {
+  id          String        @id @default(uuid())
+  title       String        @default("Mi Álbum de Patentes")
+  ownerId     String        @map("owner_id")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  owner       User          @relation("AlbumOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     AlbumMember[]
+  stickers    Sticker[]
+
+  @@map("albums")
+}
+
+model AlbumMember {
+  id        String   @id @default(uuid())
+  albumId   String   @map("album_id")
+  userId    String   @map("user_id")
+  role      Role     @default(ASSOCIATE)
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  album     Album    @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([albumId, userId])
+  @@map("album_members")
+}
+
+model Sticker {
+  id               String   @id @default(uuid())
+  albumId          String   @map("album_id")
+  slotNumber       Int      @map("slot_number") // Casillero 0 al 999
+  rawPlate         String   @map("raw_plate")   // Formato leído (ej: AB 123 CD)
+  imageUrl         String   @map("image_url")   // URL en Cloudinary o local
+  uploadedByUserId String   @map("uploaded_by_user_id")
+  capturedAt       DateTime @default(now()) @map("captured_at")
+
+  album            Album    @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  uploadedBy       User     @relation(fields: [uploadedByUserId], references: [id], onDelete: Cascade)
+
+  @@unique([albumId, slotNumber])
+  @@map("stickers")
+}

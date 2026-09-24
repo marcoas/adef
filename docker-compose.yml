@@ -1,0 +1,73 @@
+services:
+  # --------------------------------------------------------
+  # Base de Datos Relacional: PostgreSQL (Docker Local)
+  # Compatible con Supabase / Neon en despliegue de Producción
+  # --------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: patentes_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-patentes_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-patentes_pass_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-patentes_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-patentes_user} -d ${POSTGRES_DB:-patentes_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --------------------------------------------------------
+  # Backend API REST Service (Node.js + Express + TypeScript)
+  # --------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: patentes_backend
+    restart: always
+    ports:
+      - "${PORT:-4000}:4000"
+    environment:
+      PORT: 4000
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-patentes_user}:${POSTGRES_PASSWORD:-patentes_pass_secret}@postgres:5432/${POSTGRES_DB:-patentes_db}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-super_secret_jwt_key_patentes_2026_change_me}
+      FRONTEND_URL: http://localhost:3000
+      PLATE_RECOGNIZER_TOKEN: ${PLATE_RECOGNIZER_TOKEN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  # --------------------------------------------------------
+  # Frontend Web App (Next.js / React Mobile-First & Desktop)
+  # --------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: patentes_frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api
+      NEXT_PUBLIC_DEFAULT_LOCALE: es
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  postgres_data:
+    driver: local
