@@ -190,7 +190,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       }
     } catch (err) {
       console.warn('Fallback OCR error:', err);
-      setErrorMsg('No se pudo procesar la foto con OCR. Ingresa la patente manualmente.');
+      setErrorMsg('No se pudo procesar la foto con OCR. Volvé a capturar la foto o probá otra imagen.');
     } finally {
       setIsProcessingOCR(false);
     }
@@ -201,7 +201,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     setErrorMsg(null);
 
     if (!plateInput) {
-      setErrorMsg('Por favor ingresa o confirma el número de patente.');
+      setErrorMsg('No se detectó ninguna patente en la foto. Volvé a capturar la imagen.');
       return;
     }
 
@@ -431,7 +431,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             </div>
           </div>
 
-          {/* Input de Patente */}
+          {/* Input de Patente - Issue #9: readonly, el valor proviene del OCR */}
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
               {t.plateInputLabel}
@@ -439,13 +439,27 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             <input 
               type="text" 
               className="search-input" 
-              placeholder="Ej: AI 440 SA o ABC 123" 
+              placeholder="Procesando foto con OCR..."
               value={plateInput}
-              onChange={(e) => setPlateInput(e.target.value)}
-              style={{ paddingLeft: '1rem', textTransform: 'uppercase', fontFamily: 'Space Mono', fontSize: '1.1rem', letterSpacing: '1px' }}
+              readOnly
+              aria-readonly="true"
+              tabIndex={-1}
+              style={{ 
+                paddingLeft: '1rem', 
+                textTransform: 'uppercase', 
+                fontFamily: 'Space Mono', 
+                fontSize: '1.1rem', 
+                letterSpacing: '1px',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px dashed var(--border-color)',
+                color: plateInput ? 'var(--text-primary)' : 'var(--text-muted)',
+                cursor: 'default',
+              }}
             />
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
-              Casillero asignado automáticamente: <strong>#{plateInput.match(/\d{3}/)?.[0] || '___'}</strong>
+              {plateInput
+                ? <>Patente detectada automáticamente. Casillero asignado: <strong>#{plateInput.match(/\d{3}/)?.[0] || '___'}</strong></>
+                : 'La patente se completa automáticamente al procesar la foto con OCR.'}
             </p>
           </div>
 

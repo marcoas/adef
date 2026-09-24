@@ -15,6 +15,12 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_patentes_2026_change_me';
 
+// Request autenticado: el userId se extrae del JWT en `requireAuth`
+interface AuthedRequest extends Request {
+  authUserId?: string;
+  authEmail?: string;
+}
+
 // Middleware: exige un JWT válido (Authorization: Bearer <token>) para
 // interactuar con el álbum (cargar / eliminar fotos) - Issue #6
 function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -23,7 +29,9 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ error: 'Debes iniciar sesión para interactuar con el álbum.' });
   }
   try {
-    jwt.verify(header.slice(7), JWT_SECRET);
+    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { id?: string; email?: string };
+    (req as AuthedRequest).authUserId = payload.id;
+    (req as AuthedRequest).authEmail = payload.email;
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Sesión inválida o expirada. Inicia sesión nuevamente.' });
@@ -38,64 +46,63 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '25mb' }));
 
-// Helper: Seed Default User and Album if none exist
-async function getOrCreateDefaultAlbum() {
-  let user = await prisma.user.findFirst();
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        email: 'coleccionista@patentes.ar',
-        name: 'Coleccionista de Patentes',
-        authProvider: 'google',
-        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-      },
-    });
-  }
+// Helper: obtener (o crear) el ÚNICO álbum propio del usuario autenticado.
+// Issue #8: las figuritas deben pertenecer al usuario que las subió, nunca
+// al primer usuario de la base de datos (compartían todas las fotos).
+async function getOrCreateUserAlbum(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return null;
 
-  let album = await prisma.album.findFirst({
-    where: { ownerId: user.id },
-    include: { stickers: true },
-  });
-
+  let album = await prisma.album.findFirst({ where: { ownerId: user.id } });
   if (!album) {
     album = await prisma.album.create({
       data: {
-        title: 'Álbum Familiar de Patentes',
+        title: `Álbum de ${user.name}`,
         ownerId: user.id,
       },
-      include: { stickers: true },
-    });
-
-    // Seed 3 iniciales para demostración en PostgreSQL
-    await prisma.sticker.createMany({
-      data: [
-        {
-          albumId: album.id,
-          slotNumber: 42,
-          rawPlate: 'AB 042 CD',
-          imageUrl: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=500&auto=format&fit=crop&q=60',
-          uploadedByUserId: user.id,
-        },
-        {
-          albumId: album.id,
-          slotNumber: 123,
-          rawPlate: 'ABC 123',
-          imageUrl: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=60',
-          uploadedByUserId: user.id,
-        },
-        {
-          albumId: album.id,
-          slotNumber: 999,
-          rawPlate: 'AF 999 ZZZ',
-          imageUrl: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=500&auto=format&fit=crop&q=60',
-          uploadedByUserId: user.id,
-        }
-      ],
-      skipDuplicates: true,
     });
   }
 
   return { user, album };
+}
+
+// Issue #8: resolver el álbum a operar. Sin `albumId` se usa el álbum propio.
+// Con `albumId` solo se permite si el usuario es dueño o miembro invitado.
+async function resolveAccessibleAlbum(req: Request, res: Response): Promise<{ user: any; album: any } | null> {
+  const userId = (req as AuthedRequest).authUserId;
+  if (!userId) {
+    res.status(401).json({ error: 'Sesión inválida: el token no identifica a un usuario.' });
+    return null;
+  }
+
+  const albumIdParam = (req.query.albumId || req.body?.albumId) as string | undefined;
+
+  if (albumIdParam) {
+    const album = await prisma.album.findUnique({ where: { id: albumIdParam } });
+    if (!album) {
+      res.status(404).json({ error: 'Álbum no encontrado.' });
+      return null;
+    }
+
+    if (album.ownerId !== userId) {
+      const membership = await prisma.albumMember.findUnique({
+        where: { albumId_userId: { albumId: album.id, userId } },
+      });
+      if (!membership) {
+        res.status(403).json({ error: 'No tenés acceso a este álbum.' });
+        return null;
+      }
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      res.status(401).json({ error: 'Sesión inválida: el usuario ya no existe.' });
+      return null;
+    }
+    return { user, album };
+  }
+
+  return getOrCreateUserAlbum(userId);
 }
 
 // -------------------------------------------------------------
@@ -198,10 +205,14 @@ app.post('/api/plates/parse', (req: Request, res: Response) => {
 // -------------------------------------------------------------
 // OPERACIONES DE ÁLBUM & FIGURITAS EN POSTGRESQL
 // -------------------------------------------------------------
-app.get('/api/album', async (req: Request, res: Response) => {
+app.get('/api/album', requireAuth, async (req: Request, res: Response) => {
   try {
-    const { album } = await getOrCreateDefaultAlbum();
-    
+    // Issue #8: cada usuario ve únicamente su propio álbum (o uno compartido
+    // donde fue invitado). Ya no se devuelve el álbum del primer usuario.
+    const context = await resolveAccessibleAlbum(req, res);
+    if (!context) return;
+    const { album } = context;
+
     const dbStickers = await prisma.sticker.findMany({
       where: { albumId: album.id },
       include: { uploadedBy: true },
@@ -250,7 +261,11 @@ app.post('/api/album/stickers', requireAuth, async (req: Request, res: Response)
       });
     }
 
-    const { user, album } = await getOrCreateDefaultAlbum();
+    // Issue #8: la figurita se guarda en el álbum del usuario autenticado
+    // (o en el compartido indicado), nunca en el de otro usuario.
+    const context = await resolveAccessibleAlbum(req, res);
+    if (!context) return;
+    const { user, album } = context;
     const slot = plateResult.slotNumber;
 
     // Verificar unicidad en PostgreSQL DB
@@ -306,7 +321,11 @@ app.delete('/api/album/stickers/:slotNumber', requireAuth, async (req: Request, 
       return res.status(400).json({ error: 'Número de casillero inválido' });
     }
 
-    const { album } = await getOrCreateDefaultAlbum();
+    // Issue #8: solo se puede borrar del álbum propio o de uno compartido donde
+    // el usuario es miembro invitado.
+    const context = await resolveAccessibleAlbum(req, res);
+    if (!context) return;
+    const { album } = context;
 
     const existingSticker = await prisma.sticker.findUnique({
       where: {

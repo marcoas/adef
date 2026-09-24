@@ -28,7 +28,28 @@ export default function HomePage() {
   const fetchAlbumFromPostgreSQL = async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-      const res = await fetch(`${apiUrl}/album`);
+      // Issue #8: el álbum se solicita con el token para que el backend
+      // devuelva únicamente el álbum del usuario autenticado.
+      const jwtToken = localStorage.getItem('jwt_token');
+      if (!jwtToken) {
+        setStickers({});
+        setIsLoading(false);
+        return;
+      }
+
+      const res = await fetch(`${apiUrl}/album`, {
+        headers: { Authorization: `Bearer ${jwtToken}` },
+      });
+
+      if (res.status === 401) {
+        // Sesión inválida/expirada: se limpia para no mostrar datos ajenos
+        localStorage.removeItem('user_session');
+        localStorage.removeItem('jwt_token');
+        setUserSession(null);
+        setStickers({});
+        return;
+      }
+
       if (res.ok) {
         const data = await res.json();
         if (data.stickers) {
