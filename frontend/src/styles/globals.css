@@ -152,6 +152,71 @@ body {
   box-shadow: var(--glass-glow);
 }
 
+/* Issue #21: Header unificado en un solo renglón */
+.unified-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1.25rem;
+}
+
+.album-selector-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.album-select-dropdown {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.album-select-dropdown:focus {
+  border-color: var(--accent-cyan);
+}
+
+.album-progress-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+  min-width: 260px;
+  justify-content: flex-end;
+}
+
+.progress-info-text {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.compact-progress {
+  width: 140px;
+  height: 8px;
+  flex-shrink: 0;
+}
+
+.no-session-badge {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  color: #F87171;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .progress-header {
   display: flex;
   justify-content: space-between;

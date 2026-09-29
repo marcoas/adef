@@ -111,12 +111,13 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
 
   return (
     <div>
-      {/* Barra de Progreso & Selector de Álbumes */}
+      {/* Issue #21: Unificar Álbum Activo + Combo Desplegable + Progreso del Álbum en un solo renglón */}
       <div className="toolbar-container">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <BookOpen size={20} style={{ color: 'var(--accent-cyan)' }} />
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Álbum Activo:</h2>
+        <div className="progress-card unified-header-row" style={{ opacity: userSession ? 1 : 0.45 }}>
+          {/* Selector de Álbum Activo */}
+          <div className="album-selector-group">
+            <BookOpen size={18} style={{ color: 'var(--accent-cyan)' }} />
+            <span style={{ fontSize: '0.95rem', fontWeight: 700, whiteSpace: 'nowrap' }}>Álbum Activo:</span>
             <select 
               value={activeAlbumId || 'own'} 
               onChange={(e) => {
@@ -132,21 +133,11 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
               }}
               disabled={!userSession}
               title={userSession ? undefined : 'Inicia sesión para ver tus álbumes'}
-              style={{
-                background: 'rgba(255,255,255,0.08)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius-sm)',
-                color: 'var(--text-primary)',
-                padding: '0.4rem 0.8rem',
-                fontSize: '0.9rem',
-                cursor: userSession ? 'pointer' : 'not-allowed',
-                opacity: userSession ? 1 : 0.45,
-              }}
+              className="album-select-dropdown"
             >
               <option value="own" style={{ background: '#121827' }}>
                 {userSession ? `Álbum de ${userSession.name} (Propietario)` : 'Mi Álbum Principal'}
               </option>
-              {/* Issue #12: un álbum compartido por cada invitación aceptada */}
               {albums
                 .filter((a) => a.role === 'ASSOCIATE')
                 .map((a) => (
@@ -157,38 +148,36 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
             </select>
           </div>
 
+          {/* Progreso del Álbum en el mismo renglón */}
+          <div className="album-progress-group">
+            <div className="progress-info-text">
+              <Sparkles size={16} style={{ color: 'var(--accent-cyan)' }} />
+              <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{t.progressTitle}:</span>
+              <span style={{ fontFamily: 'Space Mono', fontWeight: 700, fontSize: '0.875rem' }}>
+                {userSession ? (
+                  <>
+                    <span style={{ color: 'var(--accent-cyan)' }}>{collectedCount}</span> / {TOTAL_SLOTS} ({progressPercentage}%)
+                  </>
+                ) : (
+                  'Inicia sesión'
+                )}
+              </span>
+            </div>
+
+            <div className="progress-bar-bg compact-progress">
+              <div 
+                className="progress-bar-fill" 
+                style={{ width: userSession ? `${progressPercentage}%` : '0%' }} 
+              />
+            </div>
+          </div>
+
           {!userSession && (
-            <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-sm)', padding: '0.4rem 0.8rem', fontSize: '0.85rem', color: '#F87171', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <div className="no-session-badge">
               <Lock size={14} />
-              <span>Inicia sesión para ver las fotografías del álbum</span>
+              <span>Inicia sesión para ver tu álbum</span>
             </div>
           )}
-        </div>
-
-        {/* Issue #7: sin sesión no se conoce el progreso del usuario (valores limpiados en logout) */}
-        <div className="progress-card" style={{ opacity: userSession ? 1 : 0.45 }}>
-          <div className="progress-header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Sparkles size={18} style={{ color: 'var(--accent-cyan)' }} />
-              <span style={{ fontWeight: 700 }}>{t.progressTitle}</span>
-            </div>
-            <div style={{ fontFamily: 'Space Mono', fontWeight: 700 }}>
-              {userSession ? (
-                <>
-                  <span style={{ color: 'var(--accent-cyan)' }}>{collectedCount}</span> / {TOTAL_SLOTS} ({progressPercentage}%)
-                </>
-              ) : (
-                'Inicia sesión para ver tu progreso'
-              )}
-            </div>
-          </div>
-          
-          <div className="progress-bar-bg">
-            <div 
-              className="progress-bar-fill" 
-              style={{ width: userSession ? `${progressPercentage}%` : '0%' }} 
-            />
-          </div>
         </div>
       </div>
 

@@ -67,29 +67,16 @@ export const StickerModal: React.FC<StickerModalProps> = ({
 
         {sticker ? (
           <div>
-            <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', marginBottom: '1.25rem' }}>
+            <div 
+              style={{ position: 'relative', width: '100%', aspectRatio: '16/9', marginBottom: '1.25rem', cursor: 'pointer' }}
+              onClick={() => window.open(sticker.imageUrl, '_blank')}
+              title="Haz clic para ver la foto a tamaño real"
+            >
               <img 
                 src={sticker.imageUrl} 
                 alt={`Patente ${sticker.rawPlate}`} 
                 style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--radius-md)' }}
               />
-              <div style={{
-                position: 'absolute',
-                top: '12px',
-                right: '12px',
-                background: 'rgba(16, 185, 129, 0.9)',
-                color: '#FFF',
-                padding: '4px 10px',
-                borderRadius: '999px',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                <CheckCircle2 size={14} />
-                <span>PEGADA</span>
-              </div>
             </div>
 
             <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1.5rem' }}>
