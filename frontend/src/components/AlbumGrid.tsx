@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Sparkles, Lock, BookOpen, ArrowUp, ArrowLeftRight, CheckCircle2, CircleDashed, X, History, Trophy, LogOut } from 'lucide-react';
+import { Search, Sparkles, Lock, BookOpen, ArrowUp, ArrowLeftRight, CheckCircle2, CircleDashed, X, Trophy, LogOut } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 import { StickerData } from './StickerModal';
 import { QuickJumpBar } from './QuickJumpBar';
@@ -369,18 +369,8 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
               </div>
             </div>
 
-            {/* Issue #33: acceso al log histórico de movimientos del álbum */}
-            {userSession && onOpenActivityLog && (
-              <button
-                type="button"
-                className="toolbar-icon-btn"
-                onClick={onOpenActivityLog}
-                title={t.activityLog}
-              >
-                <History size={15} />
-                <span className="toolbar-icon-btn-label">{t.activityLog}</span>
-              </button>
-            )}
+            {/* Issue #42: el acceso al log de movimientos queda únicamente en la
+                campana de notificaciones del header, no en la barra de filtros. */}
 
             {/* Issue #40: ranking de pegatinas (solo álbumes compartidos) */}
             {userSession && isSharedAlbum && (

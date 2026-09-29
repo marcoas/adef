@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Users, Car, Globe, LogIn, UserCheck, LogOut, ChevronDown, User, ShieldCheck, History, Sun, Moon } from 'lucide-react';
+import { Camera, Users, Car, Globe, LogIn, UserCheck, LogOut, ChevronDown, User, ShieldCheck, Sun, Moon } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 import { NotificationsBell, NotificationItem } from './NotificationsBell';
 
@@ -225,22 +225,10 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>{t.userPanel}</span>
                   </button>
 
-                  {/* Issue #33: Log histórico de movimientos del álbum */}
-                  {onOpenActivityLog && (
-                    <button
-                      type="button"
-                      className="user-dropdown-item"
-                      onClick={() => {
-                        setIsDropdownOpen(false);
-                        onOpenActivityLog();
-                      }}
-                    >
-                      <History size={16} style={{ color: 'var(--accent-amber)' }} />
-                      <span>{t.activityLog}</span>
-                    </button>
-                  )}
-
                   <div className="user-dropdown-divider" />
+
+                  {/* Issue #42: el log de movimientos solo se abre desde la campana
+                      de notificaciones (pie de su desplegable), no desde este menú. */}
 
                   {/* Opción 5: Cerrar Sesión */}
                   <button
