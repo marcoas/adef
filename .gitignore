@@ -8,6 +8,7 @@ dist/
 build/
 .next/
 .next.bak/
+.next-verify/
 out/
 *.tsbuildinfo
 
@@ -27,6 +28,7 @@ logs/
 
 # Database data volume
 postgres_data/
+tmp/
 
 # Imágenes almacenadas por el backend (Issue #11)
 backend/uploads/
