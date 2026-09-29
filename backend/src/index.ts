@@ -469,7 +469,7 @@ function buildInviteUrl(token: string) {
   return `${frontendUrl.replace(/\/$/, '')}/invite/${token}`;
 }
 
-app.post('/api/album/invites', requireAuth, async (req: Request, res: Response) => {
+app.post(['/api/album/invites', '/api/invites'], requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = (req as AuthedRequest).authUserId!;
     const context = await getOrCreateUserAlbum(userId);
@@ -500,7 +500,7 @@ app.post('/api/album/invites', requireAuth, async (req: Request, res: Response) 
   }
 });
 
-app.get('/api/album/invites', requireAuth, async (req: Request, res: Response) => {
+app.get(['/api/album/invites', '/api/invites'], requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = (req as AuthedRequest).authUserId!;
     const context = await getOrCreateUserAlbum(userId);

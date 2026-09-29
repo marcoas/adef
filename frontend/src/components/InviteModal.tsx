@@ -61,7 +61,13 @@ export const InviteModal: React.FC<InviteModalProps> = ({ isOpen, onClose, local
 
     try {
       if (jwtToken) {
-        const res = await fetch(`${apiUrl}/album/invites`, { method: 'POST', headers: authHeaders() });
+        const res = await fetch(`${apiUrl}/album/invites`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders(),
+          },
+        });
         if (res.ok) {
           const data = await res.json();
           setInvites((prev) => [{ ...data.invite, isValid: true }, ...prev]);
