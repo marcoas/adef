@@ -210,7 +210,7 @@ body {
 
 /* Issue #28: barra de progreso achicata para no forzar overflow */
 .compact-progress {
-  width: 100px;
+  width: 60px;
   height: 6px;
   flex-shrink: 0;
 }

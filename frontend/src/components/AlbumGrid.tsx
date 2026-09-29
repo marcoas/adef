@@ -155,7 +155,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                 <Sparkles size={16} style={{ color: 'var(--accent-cyan)' }} />
                 <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{t.progressTitle}:</span>
                 <span style={{ fontFamily: 'Space Mono', fontWeight: 700, fontSize: '0.875rem' }}>
-                  <span style={{ color: 'var(--accent-cyan)' }}>{collectedCount}</span> / {TOTAL_SLOTS} ({progressPercentage}%)
+                  <span style={{ color: 'var(--accent-cyan)' }}>{progressPercentage}%</span>
                 </span>
               </div>
 
