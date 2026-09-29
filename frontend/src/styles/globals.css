@@ -299,8 +299,8 @@ body {
   z-index: 35;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  background: rgba(11, 15, 25, 0.9);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--bg-card);
+  border-top: 1px solid var(--border-color);
   border-bottom: 1px solid var(--border-color);
   padding: 0.65rem 1.5rem;
   margin-bottom: 1.5rem;
@@ -485,7 +485,7 @@ body {
   top: calc(100% + 8px);
   right: 0;
   width: 230px;
-  background: #111827;
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 242, 254, 0.1);
@@ -676,7 +676,7 @@ body {
 }
 
 .modal-card {
-  background: #111827;
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   width: 100%;
@@ -707,7 +707,7 @@ body {
 }
 
 .close-btn:hover {
-  color: #FFF;
+  color: var(--text-primary);
 }
 
 /* Issue #28/#30: animación de despegue (peel) de la figurita al eliminarse.
@@ -1348,7 +1348,7 @@ body {
   right: 0;
   width: 320px;
   max-width: calc(100vw - 2rem);
-  background: #111827;
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);

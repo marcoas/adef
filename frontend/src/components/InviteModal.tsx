@@ -154,7 +154,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({ isOpen, onClose, local
           )}
 
           {activeInvite && (
-            <div style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '0.85rem', marginBottom: '1rem' }}>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '0.85rem', marginBottom: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', color: 'var(--accent-cyan)', marginBottom: '0.5rem' }}>
                 <Link2 size={14} />
                 Link activo · vence {new Date(activeInvite.expiresAt).toLocaleDateString()}
@@ -165,7 +165,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({ isOpen, onClose, local
                   readOnly
                   value={activeInvite.url}
                   onFocus={(e) => e.currentTarget.select()}
-                  style={{ flex: '1 1 220px', padding: '0.55rem 0.7rem', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.8rem', fontFamily: 'Space Mono' }}
+                  style={{ flex: '1 1 220px', padding: '0.55rem 0.7rem', background: 'var(--bg-card-hover)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.8rem', fontFamily: 'Space Mono' }}
                 />
                 <button type="button" className="btn-secondary" style={{ padding: '0.55rem 0.7rem' }} onClick={() => copyLink(activeInvite)}>
                   {copiedToken === activeInvite.token ? <Check size={16} style={{ color: '#22C55E' }} /> : <Copy size={16} />}

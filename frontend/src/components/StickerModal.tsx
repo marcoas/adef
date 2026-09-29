@@ -154,7 +154,7 @@ export const StickerModal: React.FC<StickerModalProps> = ({
                 <div className="peelable__flap" />
               </div>
 
-            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
                 <Calendar size={16} />
                 <span>{t.capturedAt}: {new Date(sticker.capturedAt).toLocaleDateString()}</span>
