@@ -81,6 +81,26 @@ export const translations = {
     enableBrowserNotif: 'Activar avisos del navegador',
     browserNotifOn: 'Avisos del navegador activados',
     browserNotifBlocked: 'El navegador bloqueó los avisos',
+    // Issue #36: tema claro/oscuro
+    themeLight: 'Cambiar a tema claro',
+    themeDark: 'Cambiar a tema oscuro',
+    // Issue #39: log de invitaciones aceptadas/vencidas con fotos aportadas
+    inviteLog: 'Historial de invitaciones',
+    inviteLogEmpty: 'Todavía no generaste links de invitación.',
+    inviteLogStickers: 'figuritas aportadas',
+    inviteAccepted: 'Aceptada',
+    inviteExpired: 'Vencida',
+    invitePending: 'Pendiente',
+    // Issue #40: ranking de pegatinas
+    ranking: 'Ranking',
+    rankingTitle: 'Ranking de pegatinas',
+    rankingOnlyShared: 'El ranking solo está disponible en álbumes compartidos.',
+    rankingEmpty: 'Todavía no hay figuritas pegadas.',
+    ownerTag: 'Dueño',
+    // Issue #37: desvincularse de un álbum compartido
+    leaveAlbum: 'Desvincularme de este álbum',
+    leaveAlbumConfirm: '¿Seguro que querés desvincularte de este álbum? El dueño será notificado.',
+    leaveAlbumSuccess: 'Te desvinculaste del álbum.',
   },
   en: {
     appTitle: 'License Plate Album',
@@ -157,6 +177,26 @@ export const translations = {
     enableBrowserNotif: 'Enable browser notifications',
     browserNotifOn: 'Browser notifications enabled',
     browserNotifBlocked: 'The browser blocked notifications',
+    // Issue #36: light/dark theme
+    themeLight: 'Switch to light theme',
+    themeDark: 'Switch to dark theme',
+    // Issue #39: invitation log
+    inviteLog: 'Invitation history',
+    inviteLogEmpty: 'You have not created invitation links yet.',
+    inviteLogStickers: 'stickers contributed',
+    inviteAccepted: 'Accepted',
+    inviteExpired: 'Expired',
+    invitePending: 'Pending',
+    // Issue #40: sticker ranking
+    ranking: 'Ranking',
+    rankingTitle: 'Sticker ranking',
+    rankingOnlyShared: 'Ranking is only available in shared albums.',
+    rankingEmpty: 'No stickers pasted yet.',
+    ownerTag: 'Owner',
+    // Issue #37: leave a shared album
+    leaveAlbum: 'Leave this album',
+    leaveAlbumConfirm: 'Are you sure you want to leave this album? The owner will be notified.',
+    leaveAlbumSuccess: 'You left the album.',
   },
 };
 

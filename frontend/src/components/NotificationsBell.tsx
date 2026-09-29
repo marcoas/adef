@@ -6,7 +6,7 @@ import { getTranslation, Locale } from '../lib/i18n';
 
 export interface NotificationItem {
   id: string;
-  type: 'STICKER_PASTED' | 'ASSOCIATE_JOINED';
+  type: 'STICKER_PASTED' | 'ASSOCIATE_JOINED' | 'ASSOCIATE_LEFT';
   albumId: string;
   albumTitle: string;
   actorName: string;

@@ -23,10 +23,11 @@ enum StickerAction {
   UNPASTE
 }
 
-// Issue #34: tipos de aviso que puede recibir un usuario
+// Issue #34 + #37: tipos de aviso que puede recibir un usuario
 enum NotificationType {
   STICKER_PASTED
   ASSOCIATE_JOINED
+  ASSOCIATE_LEFT
 }
 
 model User {

@@ -132,7 +132,7 @@ async function notifyAlbumOwner(params: {
   albumId: string;
   actorId: string;
   actorName: string;
-  type: 'STICKER_PASTED' | 'ASSOCIATE_JOINED';
+  type: 'STICKER_PASTED' | 'ASSOCIATE_JOINED' | 'ASSOCIATE_LEFT';
   slotNumber?: number;
   rawPlate?: string;
   message: string;
@@ -827,6 +827,47 @@ app.get('/api/album/members', requireAuth, async (req: Request, res: Response) =
   }
 });
 
+// Issue #37: un asociado puede desvincularse de un álbum compartido.
+// El dueño no puede abandonar su propio álbum por esta vía.
+app.delete('/api/albums/:albumId/leave', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as AuthedRequest).authUserId!;
+    const { albumId } = req.params;
+
+    const album = await prisma.album.findUnique({ where: { id: albumId } });
+    if (!album) {
+      return res.status(404).json({ error: 'Álbum no encontrado.' });
+    }
+    if (album.ownerId === userId) {
+      return res.status(400).json({ error: 'El dueño no puede abandonar su propio álbum.' });
+    }
+
+    const membership = await prisma.albumMember.findUnique({
+      where: { albumId_userId: { albumId, userId } },
+    });
+    if (!membership) {
+      return res.status(404).json({ error: 'No pertenecés a este álbum.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    await prisma.albumMember.delete({ where: { id: membership.id } });
+
+    // Issue #37: avisar al dueño que el asociado se desvinculó
+    await notifyAlbumOwner({
+      albumId,
+      actorId: userId,
+      actorName: user ? user.name : 'Un asociado',
+      type: 'ASSOCIATE_LEFT',
+      message: `${user ? user.name : 'Un asociado'} se desvinculó de tu álbum "${album.title}".`,
+    });
+
+    return res.json({ message: `Te desvinculaste del álbum "${album.title}".` });
+  } catch (error) {
+    console.error('Error al desvincularse del álbum:', error);
+    return res.status(500).json({ error: 'Error al desvincularse del álbum' });
+  }
+});
+
 app.delete('/api/album/members/:memberUserId', requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = (req as AuthedRequest).authUserId!;
@@ -843,6 +884,58 @@ app.delete('/api/album/members/:memberUserId', requireAuth, async (req: Request,
   } catch (error) {
     console.error('Error al revocar miembro:', error);
     return res.status(500).json({ error: 'Error al revocar el miembro del álbum' });
+  }
+});
+
+// -------------------------------------------------------------
+// Issue #39: LOG DE INVITACIONES (aceptadas/rechazadas por otros = usadas,
+// vencidas, revocadas) con fecha y fotos aportadas por cada invitado.
+// -------------------------------------------------------------
+app.get('/api/invites/log', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as AuthedRequest).authUserId!;
+    const context = await getOrCreateUserAlbum(userId);
+    if (!context) return res.status(401).json({ error: 'Usuario no encontrado.' });
+    const { album } = context;
+
+    const invites = await prisma.albumInvite.findMany({
+      where: { albumId: album.id },
+      include: { usedBy: { select: { id: true, name: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    // Fotos pegadas por cada invitado que aceptó, para el conteo del log
+    const usedByIds = [...new Set(invites.map((i) => i.usedById).filter(Boolean))] as string[];
+    const counts = usedByIds.length
+      ? await prisma.sticker.groupBy({
+          by: ['uploadedByUserId'],
+          where: { albumId: album.id, uploadedByUserId: { in: usedByIds } },
+          _count: { uploadedByUserId: true },
+        })
+      : [];
+    const countByUser: Record<string, number> = {};
+    for (const c of counts) countByUser[c.uploadedByUserId] = c._count.uploadedByUserId;
+
+    const now = new Date();
+    return res.json({
+      log: invites.map((i) => {
+        const status = i.usedAt ? 'accepted' : i.expiresAt <= now ? 'expired' : 'pending';
+        return {
+          id: i.id,
+          token: i.token,
+          createdAt: i.createdAt.toISOString(),
+          expiresAt: i.expiresAt.toISOString(),
+          usedAt: i.usedAt ? i.usedAt.toISOString() : null,
+          status,
+          usedBy: i.usedBy,
+          stickersAdded: i.usedById ? countByUser[i.usedById] || 0 : 0,
+        };
+      }),
+    });
+  } catch (error) {
+    console.error('Error al obtener el log de invitaciones:', error);
+    return res.status(500).json({ error: 'Error al obtener el log de invitaciones' });
   }
 });
 
@@ -928,6 +1021,59 @@ app.post('/api/invites/:token/accept', requireAuth, async (req: Request, res: Re
   } catch (error) {
     console.error('Error al aceptar la invitación:', error);
     return res.status(500).json({ error: 'Error al aceptar la invitación' });
+  }
+});
+
+// -------------------------------------------------------------
+// Issue #40: RANKING DE PEGATINAS por usuario (solo álbumes con asociados).
+// Requiere ser dueño o miembro del álbum.
+// -------------------------------------------------------------
+app.get('/api/albums/:albumId/ranking', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as AuthedRequest).authUserId!;
+    const { albumId } = req.params;
+
+    const album = await prisma.album.findUnique({
+      where: { id: albumId },
+      include: { owner: { select: { id: true, name: true } }, members: { select: { userId: true } } },
+    });
+    if (!album) return res.status(404).json({ error: 'Álbum no encontrado.' });
+    const isOwner = album.ownerId === userId;
+    const isMember = album.members.some((m) => m.userId === userId);
+    if (!isOwner && !isMember) {
+      return res.status(403).json({ error: 'No tenés acceso a este álbum.' });
+    }
+
+    const memberCount = album.members.length + 1; // dueño + asociados
+    const groups = await prisma.sticker.groupBy({
+      by: ['uploadedByUserId'],
+      where: { albumId },
+      _count: { uploadedByUserId: true },
+    });
+    const uploaderIds = groups.map((g) => g.uploadedByUserId);
+    const users = uploaderIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: uploaderIds } },
+          select: { id: true, name: true, avatarUrl: true },
+        })
+      : [];
+    const nameById: Record<string, { name: string; avatarUrl?: string | null }> = {};
+    for (const u of users) nameById[u.id] = { name: u.name, avatarUrl: u.avatarUrl };
+
+    const ranking = groups
+      .map((g) => ({
+        userId: g.uploadedByUserId,
+        name: nameById[g.uploadedByUserId]?.name || 'Usuario',
+        avatarUrl: nameById[g.uploadedByUserId]?.avatarUrl || null,
+        count: g._count.uploadedByUserId,
+        isOwner: g.uploadedByUserId === album.ownerId,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    return res.json({ albumId, albumTitle: album.title, memberCount, ranking });
+  } catch (error) {
+    console.error('Error al obtener el ranking del álbum:', error);
+    return res.status(500).json({ error: 'Error al obtener el ranking' });
   }
 });
 

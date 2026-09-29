@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Sparkles, Lock, BookOpen, ArrowUp, ArrowLeftRight, CheckCircle2, CircleDashed, X, History } from 'lucide-react';
+import { Search, Sparkles, Lock, BookOpen, ArrowUp, ArrowLeftRight, CheckCircle2, CircleDashed, X, History, Trophy, LogOut } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 import { StickerData } from './StickerModal';
 import { QuickJumpBar } from './QuickJumpBar';
+import { RankingModal } from './RankingModal';
 
 export interface AlbumOption {
   id: string;
@@ -55,6 +56,30 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
   const [showScrollTop, setShowScrollTop] = useState(false);
   // Issue #32: centena activa según la posición del scroll
   const [activeGroup, setActiveGroup] = useState<number | null>(null);
+  // Issue #40: popup del ranking de pegatinas (solo álbumes compartidos)
+  const [isRankingOpen, setIsRankingOpen] = useState(false);
+  const activeAlbumRole = albums.find((a) => a.id === activeAlbumId)?.role;
+  const isSharedAlbum = albums.length > 0 && albums.some((a) => a.role === 'ASSOCIATE');
+
+  // Issue #37: el asociado puede desvincularse del álbum compartido activo
+  const handleLeaveAlbum = async () => {
+    if (!activeAlbumId || activeAlbumRole !== 'ASSOCIATE') return;
+    if (!window.confirm(t.leaveAlbumConfirm)) return;
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+      const jwtToken = localStorage.getItem('jwt_token');
+      const res = await fetch(`${apiUrl}/albums/${activeAlbumId}/leave`, {
+        method: 'DELETE',
+        headers: jwtToken ? { Authorization: `Bearer ${jwtToken}` } : {},
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Error');
+      alert(t.leaveAlbumSuccess);
+      window.location.reload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al desvincularse.');
+    }
+  };
 
   // Issue #16: botón flotante al pie para scroll rápido hacia el inicio
   useEffect(() => {
@@ -182,6 +207,22 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
       if (rafId) window.cancelAnimationFrame(rafId);
     };
   }, [showQuickJump, userSession]);
+
+  // Issue #35: al pegar una figurita nueva, limpiar filtros/búsqueda y llevar
+  // el scroll hasta el casillero recién cargado para que quede en pantalla.
+  useEffect(() => {
+    if (recentAddedSlot === null || recentAddedSlot === undefined) return;
+    setSearchTerm('');
+    setFilterType('all');
+    // Esperar al re-render con filtros limpios antes de buscar el casillero
+    const timer = setTimeout(() => {
+      const target = document.getElementById(`slot-${recentAddedSlot}`);
+      if (!target) return;
+      const top = target.getBoundingClientRect().top + window.scrollY - getStickyOffset();
+      window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [recentAddedSlot]);
 
   return (
     <div>
@@ -340,9 +381,45 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                 <span className="toolbar-icon-btn-label">{t.activityLog}</span>
               </button>
             )}
+
+            {/* Issue #40: ranking de pegatinas (solo álbumes compartidos) */}
+            {userSession && isSharedAlbum && (
+              <button
+                type="button"
+                className="toolbar-icon-btn"
+                onClick={() => setIsRankingOpen(true)}
+                title={t.rankingTitle}
+              >
+                <Trophy size={15} />
+                <span className="toolbar-icon-btn-label">{t.ranking}</span>
+              </button>
+            )}
+
+            {/* Issue #37: desvincularse del álbum compartido activo */}
+            {userSession && activeAlbumRole === 'ASSOCIATE' && (
+              <button
+                type="button"
+                className="toolbar-icon-btn"
+                onClick={handleLeaveAlbum}
+                title={t.leaveAlbum}
+                style={{ color: '#EF4444' }}
+              >
+                <LogOut size={15} />
+                <span className="toolbar-icon-btn-label">{t.leaveAlbum}</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Issue #40: popup del ranking */}
+      <RankingModal
+        isOpen={isRankingOpen}
+        onClose={() => setIsRankingOpen(false)}
+        locale={locale}
+        albumId={activeAlbumId}
+        albumTitle={albums.find((a) => a.id === activeAlbumId)?.title}
+      />
 
       {/* Issue #32: barra flotante de links rápidos (sólo sin filtros) */}
       {showQuickJump && (
@@ -364,7 +441,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
             <div 
               key={slot}
               id={`slot-${slot}`}
-              className={`sticker-slot ${sticker ? 'collected' : ''} ${!userSession ? 'slot-disabled-no-session' : ''}`}
+              className={`sticker-slot ${sticker ? 'collected' : ''} ${!userSession ? 'slot-disabled-no-session' : ''} ${recentAddedSlot === slot ? 'flash-new' : ''}`}
               onClick={() => {
                 if (!userSession) return;
                 onSlotClick(slot);

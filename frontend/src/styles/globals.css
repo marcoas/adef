@@ -16,6 +16,40 @@
   --radius-lg: 16px;
   --radius-md: 12px;
   --radius-sm: 8px;
+  color-scheme: dark;
+}
+
+/* Issue #36: tema claro conmutable por el usuario ([data-theme='light'] en <html>) */
+html[data-theme='light'] {
+  --bg-main: #F1F5F9;
+  --bg-card: rgba(255, 255, 255, 0.92);
+  --bg-card-hover: rgba(255, 255, 255, 1);
+  --border-color: rgba(15, 23, 42, 0.12);
+  --accent-cyan: #0284C7;
+  --accent-blue: #2563EB;
+  --accent-amber: #B45309;
+  --accent-emerald: #047857;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
+  --glass-glow: 0 8px 32px 0 rgba(37, 99, 235, 0.12);
+  color-scheme: light;
+}
+
+html[data-theme='light'] body {
+  background-image:
+    radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(2, 132, 199, 0.06) 0px, transparent 50%);
+}
+
+html[data-theme='light'] .header-container {
+  background: rgba(255, 255, 255, 0.88);
+}
+
+html[data-theme='light'] .brand-title {
+  background: linear-gradient(135deg, #0F172A, #475569);
+  -webkit-background-clip: text;
+  background-clip: text;
 }
 
 * {
@@ -1436,6 +1470,96 @@ body {
 .notifications-footer-link:hover {
   background: rgba(0, 242, 254, 0.1);
   color: var(--accent-cyan);
+}
+
+# Issue #40: popup con el ranking de pegatinas por usuario (solo álbumes compartidos)
+.ranking-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 1rem;
+}
+
+.ranking-modal {
+  width: 100%;
+  max-width: 420px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  box-shadow: var(--glass-glow);
+}
+
+.ranking-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.25rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.9rem;
+}
+
+.ranking-row:last-child {
+  border-bottom: none;
+}
+
+.ranking-pos {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.ranking-pos.first {
+  background: linear-gradient(135deg, var(--accent-amber), #FDE68A);
+  color: #0B0F19;
+}
+
+.ranking-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+  margin-top: 0.25rem;
+}
+
+/* Issue #35: resaltar el casillero recién pegado al llevar el scroll hasta él */
+.sticker-slot.flash-new {
+  animation: slot-flash 1.6s ease;
+}
+
+@keyframes slot-flash {
+  0%, 40% { box-shadow: 0 0 0 3px var(--accent-cyan), 0 0 18px rgba(0, 242, 254, 0.6); }
+  100% { box-shadow: none; }
+}
+
+/* Issue #37: botón de desvincularse de un álbum compartido */
+.leave-album-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: var(--radius-md);
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #EF4444;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 /* Preferencia de avisos de actividad (UserModal, Issue #34) */

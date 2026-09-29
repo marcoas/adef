@@ -62,6 +62,17 @@ export const UserModal: React.FC<UserModalProps> = ({
   // Issue #34: preferencia de avisos de actividad del álbum
   const [notifyAlbumActivity, setNotifyAlbumActivity] = useState(true);
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
+  // Issue #39: historial de invitaciones (aceptadas/vencidas + fotos aportadas)
+  interface InviteLogEntry {
+    id: string;
+    createdAt: string;
+    expiresAt: string;
+    usedAt: string | null;
+    status: 'accepted' | 'expired' | 'pending';
+    usedBy: { id: string; name: string; email: string } | null;
+    stickersAdded: number;
+  }
+  const [inviteLog, setInviteLog] = useState<InviteLogEntry[]>([]);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -74,11 +85,13 @@ export const UserModal: React.FC<UserModalProps> = ({
     if (!userSession) return;
     setIsLoading(true);
     try {
-      const [invitesRes, membersRes, prefsRes] = await Promise.all([
+      const [invitesRes, membersRes, prefsRes, logRes] = await Promise.all([
         fetch(`${apiUrl}/album/invites`, { headers: authHeaders() }),
         fetch(`${apiUrl}/album/members`, { headers: authHeaders() }),
         // Issue #34: preferencia de avisos de actividad del álbum
         fetch(`${apiUrl}/users/me/preferences`, { headers: authHeaders() }),
+        // Issue #39: historial de invitaciones cerca del gestor de invitaciones
+        fetch(`${apiUrl}/invites/log`, { headers: authHeaders() }),
       ]);
 
       if (invitesRes.ok) {
@@ -94,6 +107,10 @@ export const UserModal: React.FC<UserModalProps> = ({
         if (typeof prefsData.notifyOnAlbumActivity === 'boolean') {
           setNotifyAlbumActivity(prefsData.notifyOnAlbumActivity);
         }
+      }
+      if (logRes.ok) {
+        const logData = await logRes.json();
+        setInviteLog(logData.log || []);
       }
     } catch (err) {
       console.error('Error cargando datos del panel de usuario:', err);
@@ -475,6 +492,46 @@ export const UserModal: React.FC<UserModalProps> = ({
                           <span>{t.revoke}</span>
                         </button>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Issue #39: historial de invitaciones (fecha + fotos aportadas) */}
+            <div style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '0.75rem' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Link2 size={14} />
+                {t.inviteLog}
+              </div>
+              {isLoading ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                  <Loader2 size={16} className="animate-spin" style={{ marginRight: '0.5rem' }} />
+                  Cargando...
+                </div>
+              ) : inviteLog.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                  {t.inviteLogEmpty}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '200px', overflowY: 'auto' }}>
+                  {inviteLog.map((entry) => (
+                    <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '0.5rem 0.75rem', fontSize: '0.8rem' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {entry.usedBy ? entry.usedBy.name : '—'}
+                        </div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                          {entry.status === 'accepted' && entry.usedAt
+                            ? `${t.inviteAccepted} · ${new Date(entry.usedAt).toLocaleDateString()} · ${entry.stickersAdded} ${t.inviteLogStickers}`
+                            : entry.status === 'expired'
+                              ? `${t.inviteExpired} · ${new Date(entry.expiresAt).toLocaleDateString()}`
+                              : `${t.invitePending} · ${locale === 'en' ? 'expires' : 'vence'} ${new Date(entry.expiresAt).toLocaleDateString()}`}
+                        </div>
+                      </div>
+                      <span style={{ fontWeight: 700, fontSize: '0.75rem', color: entry.status === 'accepted' ? '#10B981' : 'var(--text-muted)', flexShrink: 0 }}>
+                        {entry.status === 'accepted' ? t.inviteAccepted : entry.status === 'expired' ? t.inviteExpired : t.invitePending}
+                      </span>
                     </div>
                   ))}
                 </div>

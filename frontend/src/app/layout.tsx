@@ -12,8 +12,17 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Issue #36: tema claro/oscuro. Script inline anti-flash: lee localStorage
+  // antes del primer render (default: oscuro, respetando solo 'light' guardado).
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('album-theme');if(t==='light'){document.documentElement.setAttribute('data-theme','light');}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body>
         {children}
       </body>
