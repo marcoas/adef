@@ -16,7 +16,7 @@ export const translations = {
     progressTitle: 'Progreso del Álbum',
     collected: 'Pegadas',
     total: 'Total',
-    uploadButton: 'Capturar Patente',
+    uploadButton: 'Pegar Foto',
     pasteSticker: 'Pegar Figurita',
     scanOCR: 'Escanear con OCR',
     plateInputLabel: 'Número de Patente',

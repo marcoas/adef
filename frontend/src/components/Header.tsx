@@ -108,15 +108,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="header-actions">
-          <button 
-            className="btn-secondary" 
-            onClick={() => setLocale(locale === 'es' ? 'en' : 'es')}
-            title="Cambiar idioma"
-          >
-            <Globe size={18} />
-            <span>{locale.toUpperCase()}</span>
-          </button>
-
           {/* Issue #15 & #17: Menú de usuario desplegable. Botón muestra SOLO el icono de usuario/OAuth */}
           {userSession ? (
             <div style={{ position: 'relative' }} ref={dropdownRef}>
@@ -138,7 +129,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <ChevronDown size={14} style={{ transition: 'transform 0.2s', transform: isDropdownOpen ? 'rotate(180deg)' : 'none', color: 'var(--text-secondary)' }} />
               </button>
 
-              {/* Menú Desplegable: Al hacer click muestra nombre y opciones */}
+              {/* Menú Desplegable: Al hacer click muestra nombre y opciones (Panel, Invitar, Idioma, Logout) */}
               {isDropdownOpen && (
                 <div className="user-dropdown-menu">
                   {/* Cabecera del usuario con avatar + nombre + email */}
@@ -233,22 +224,11 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* Botón Invitar Asociado en Header */}
-          <button
-            className="btn-secondary"
-            onClick={userSession ? onOpenInvite : onOpenLogin}
-            title={userSession ? undefined : 'Inicia sesión para invitar a un asociado'}
-            style={!userSession ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
-          >
-            <Users size={18} />
-            <span>{t.invitePartner}</span>
-          </button>
-
-          {/* Botón Capturar Patente */}
+          {/* Botón Pegar Foto */}
           <button
             className="btn-primary"
             onClick={onOpenUpload}
-            title={userSession ? undefined : 'Inicia sesión para capturar una patente'}
+            title={userSession ? undefined : 'Inicia sesión para pegar una foto'}
             style={!userSession ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
           >
             <Camera size={18} />
