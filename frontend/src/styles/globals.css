@@ -1113,9 +1113,50 @@ body {
   box-shadow: 0 0 12px rgba(0, 242, 254, 0.5);
 }
 
-/* La barra taparía la rejilla en pantallas angostas */
+/* Issue #32 (feedback): en pantallas angostas la barra colapsa en un botón
+   flotante que despliega la barra, para que siempre sea accesible */
+.quick-jump-mobile { display: none; }
+.quick-jump-desktop { display: contents; }
+
+.quick-jump-fab {
+  position: fixed;
+  right: 14px;
+  bottom: 76px;
+  z-index: 70;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(11, 15, 25, 0.85);
+  border: 1px solid var(--border-color);
+  color: var(--accent-cyan);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+
+.quick-jump-popover {
+  position: fixed;
+  inset: 0;
+  z-index: 69;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 70px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.quick-jump-bar--popover {
+  position: static;
+  transform: none;
+}
+
 @media (max-width: 1180px) {
-  .quick-jump-bar { display: none; }
+  .quick-jump-desktop .quick-jump-bar { display: none; }
+  .quick-jump-mobile { display: contents; }
 }
 
 /* Botón icono + label de la barra de controles (toolbar) */

@@ -421,14 +421,28 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
         albumTitle={albums.find((a) => a.id === activeAlbumId)?.title}
       />
 
-      {/* Issue #32: barra flotante de links rápidos (sólo sin filtros) */}
+      {/* Issue #32: barra flotante de links rápidos (sólo sin filtros).
+          En pantallas angostas colapsa en botón flotante (feedback #32). */}
       {showQuickJump && (
-        <QuickJumpBar
-          locale={locale}
-          groups={JUMP_GROUPS}
-          activeGroup={activeGroup}
-          onJump={jumpToGroup}
-        />
+        <>
+          <span className="quick-jump-desktop">
+            <QuickJumpBar
+              locale={locale}
+              groups={JUMP_GROUPS}
+              activeGroup={activeGroup}
+              onJump={jumpToGroup}
+            />
+          </span>
+          <span className="quick-jump-mobile">
+            <QuickJumpBar
+              locale={locale}
+              groups={JUMP_GROUPS}
+              activeGroup={activeGroup}
+              onJump={jumpToGroup}
+              collapsed
+            />
+          </span>
+        </>
       )}
 
       {/* Rejilla del Álbum 000-999 */}
