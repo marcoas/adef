@@ -109,7 +109,9 @@ async function resolveAccessibleAlbum(req: Request, res: Response): Promise<{ us
         where: { albumId_userId: { albumId: album.id, userId } },
       });
       if (!membership) {
-        res.status(403).json({ error: 'No tenés acceso a este álbum.' });
+        // Issue #37 (feedback): acceso revocado mientras el invitado tenía el
+        // álbum abierto → 403 con flag para que el frontend lo expulse al instante.
+        res.status(403).json({ error: 'Tu acceso a este álbum fue revocado por el dueño.', accessRevoked: true });
         return null;
       }
     }
@@ -132,7 +134,7 @@ async function notifyAlbumOwner(params: {
   albumId: string;
   actorId: string;
   actorName: string;
-  type: 'STICKER_PASTED' | 'ASSOCIATE_JOINED' | 'ASSOCIATE_LEFT';
+  type: 'STICKER_PASTED' | 'ASSOCIATE_JOINED' | 'ASSOCIATE_LEFT' | 'ACCESS_REVOKED';
   slotNumber?: number;
   rawPlate?: string;
   message: string;
@@ -876,9 +878,28 @@ app.delete('/api/album/members/:memberUserId', requireAuth, async (req: Request,
     const { album } = context;
 
     const { memberUserId } = req.params;
-    await prisma.albumMember.deleteMany({
+    const removed = await prisma.albumMember.deleteMany({
       where: { albumId: album.id, userId: memberUserId },
     });
+
+    // Issue #37 (feedback): avisar al invitado expulsado y revocar su acceso
+    // de inmediato para que no pueda seguir viendo/cargando fotos. El frontend
+    // detecta este 403 (accessRevoked) y lo expulsa del álbum al instante.
+    if (removed.count > 0) {
+      const removedUser = await prisma.user.findUnique({ where: { id: memberUserId } });
+      if (removedUser) {
+        await prisma.notification.create({
+          data: {
+            userId: memberUserId,
+            albumId: album.id,
+            actorUserId: userId,
+            actorName: context.user.name,
+            type: 'ACCESS_REVOKED',
+            message: `Tu acceso al álbum "${album.title}" fue revocado por ${context.user.name}.`,
+          },
+        });
+      }
+    }
 
     return res.json({ message: 'Miembro revocado del álbum con éxito.' });
   } catch (error) {

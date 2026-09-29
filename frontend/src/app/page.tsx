@@ -75,6 +75,22 @@ export default function HomePage() {
           setStickers(data.stickers);
         }
       }
+      // Issue #37 (feedback): si el dueño me revocó el acceso mientras tenía el
+      // álbum abierto, el backend responde 403 con accessRevoked: expulsar al
+      // instante al álbum propio y avisar, para no seguir viendo/cargando fotos.
+      else if (res.status === 403) {
+        const data = await res.json().catch(() => ({}));
+        if (data.accessRevoked) {
+          setActiveAlbumId(null);
+          setStickers({});
+          alert(data.error || 'Tu acceso a este álbum fue revocado.');
+          const list = await fetchMyAlbums();
+          setAlbums(list);
+          const fallback = list.find((a) => a.role === 'OWNER') || list[0];
+          setActiveAlbumId(fallback ? fallback.id : null);
+          await fetchAlbumFromPostgreSQL(fallback ? fallback.id : null);
+        }
+      }
     } catch (err) {
       console.error('Error al cargar datos desde la API de PostgreSQL:', err);
     } finally {

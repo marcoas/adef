@@ -6,7 +6,7 @@ import { getTranslation, Locale } from '../lib/i18n';
 
 export interface NotificationItem {
   id: string;
-  type: 'STICKER_PASTED' | 'ASSOCIATE_JOINED' | 'ASSOCIATE_LEFT';
+  type: 'STICKER_PASTED' | 'ASSOCIATE_JOINED' | 'ASSOCIATE_LEFT' | 'ACCESS_REVOKED';
   albumId: string;
   albumTitle: string;
   actorName: string;
@@ -74,6 +74,13 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
 
         if (allowNativeAlert && latest && previousLatest && latest > previousLatest) {
           const fresh = items.filter((n) => !n.readAt && n.createdAt > previousLatest);
+          // Issue #37 (feedback): si me revocaron el acceso, expulsar al instante
+          // aunque el usuario tenga el álbum abierto (sin esperar al polling lento).
+          const revoked = fresh.find((n) => n.type === 'ACCESS_REVOKED');
+          if (revoked && typeof window !== 'undefined') {
+            window.location.reload();
+            return;
+          }
           if (fresh.length > 0 && typeof window !== 'undefined' && 'Notification' in window && window.Notification.permission === 'granted') {
             fresh.slice(0, 3).forEach((n) => {
               try {

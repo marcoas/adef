@@ -28,6 +28,7 @@ enum NotificationType {
   STICKER_PASTED
   ASSOCIATE_JOINED
   ASSOCIATE_LEFT
+  ACCESS_REVOKED
 }
 
 model User {
