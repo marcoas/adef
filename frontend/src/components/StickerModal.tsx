@@ -162,6 +162,7 @@ export const StickerModal: React.FC<StickerModalProps> = ({
           </div>
         )}
       </div>
+    </div>
 
       {/* Issue #23: Visualización a tamaño real con botón claro para volver al álbum / cerrar */}
       {isFullscreen && sticker && (
