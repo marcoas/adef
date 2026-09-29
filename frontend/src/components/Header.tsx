@@ -1,31 +1,12 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Users, Car, Globe, LogIn, UserCheck, LogOut, ChevronDown, User, ShieldCheck, Sun, Moon } from 'lucide-react';
+import { Camera, Users, Car, Globe, LogIn, UserCheck, LogOut, ChevronDown, User, ShieldCheck } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 import { NotificationsBell, NotificationItem } from './NotificationsBell';
 
-// Issue #36: tema claro/oscuro persistido en localStorage (default: oscuro)
-export type Theme = 'dark' | 'light';
-export const THEME_STORAGE_KEY = 'album-theme';
-export function getStoredTheme(): Theme {
-  if (typeof window === 'undefined') return 'dark';
-  try {
-    return window.localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark';
-  } catch {
-    return 'dark';
-  }
-}
-export function applyTheme(theme: Theme) {
-  if (typeof document === 'undefined') return;
-  if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
-  else document.documentElement.removeAttribute('data-theme');
-  try {
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-  } catch {
-    /* almacenamiento no disponible */
-  }
-}
+// Issue #36: el tema se aplica al montar y se controla desde el panel de usuario (#43)
+import { getStoredTheme, applyTheme } from '../lib/theme';
 
 interface UserSession {
   email: string;
@@ -102,18 +83,11 @@ export const Header: React.FC<HeaderProps> = ({
     };
   }, [isDropdownOpen]);
 
-  // Issue #36: estado del tema (se aplica al <html> y persiste)
-  const [theme, setTheme] = useState<Theme>('dark');
+  // Issue #36/#43: aplica el tema guardado al montar. El control para cambiarlo
+  // vive en el panel de usuario, así que aquí no hace falta mantener estado.
   useEffect(() => {
-    const stored = getStoredTheme();
-    setTheme(stored);
-    applyTheme(stored);
+    applyTheme(getStoredTheme());
   }, []);
-  const toggleTheme = () => {
-    const next: Theme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    applyTheme(next);
-  };
 
   // Issue #17: Renderizar icono de autenticación
   const renderAuthIcon = () => {
@@ -150,17 +124,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="header-actions">
-          {/* Issue #36: alternar tema claro/oscuro */}
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={toggleTheme}
-            title={theme === 'dark' ? t.themeLight : t.themeDark}
-            aria-label={theme === 'dark' ? t.themeLight : t.themeDark}
-            style={{ padding: '0.6rem 0.75rem' }}
-          >
-            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
           {/* Issue #34: campana de notificaciones de actividad del álbum */}
           {userSession && (
             <NotificationsBell

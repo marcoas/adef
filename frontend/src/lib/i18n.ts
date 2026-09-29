@@ -84,6 +84,9 @@ export const translations = {
     // Issue #36: tema claro/oscuro
     themeLight: 'Cambiar a tema claro',
     themeDark: 'Cambiar a tema oscuro',
+    // Issue #43: etiqueta corta del botón de tema en el panel de usuario
+    themeLightShort: 'Claro',
+    themeDarkShort: 'Oscuro',
     // Issue #39: log de invitaciones aceptadas/vencidas con fotos aportadas
     inviteLog: 'Historial de invitaciones',
     inviteLogEmpty: 'Todavía no generaste links de invitación.',
@@ -180,6 +183,9 @@ export const translations = {
     // Issue #36: light/dark theme
     themeLight: 'Switch to light theme',
     themeDark: 'Switch to dark theme',
+    // Issue #43: short label for the theme button in the user panel
+    themeLightShort: 'Light',
+    themeDarkShort: 'Dark',
     // Issue #39: invitation log
     inviteLog: 'Invitation history',
     inviteLogEmpty: 'You have not created invitation links yet.',

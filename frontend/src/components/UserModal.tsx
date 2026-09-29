@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  X, User, Mail, Globe, Users, Trash2, Copy, Check, 
-  Share2, Plus, AlertCircle, Loader2, LogOut, ShieldCheck, Link2, Bell
+import {
+  X, User, Mail, Globe, Users, Trash2, Copy, Check,
+  Share2, Plus, AlertCircle, Loader2, LogOut, ShieldCheck, Link2, Bell, Sun, Moon
 } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
+// Issue #43: el cambio de tema se expone desde el panel de usuario
+import { Theme, getStoredTheme, applyTheme } from '../lib/theme';
 
 interface UserSession {
   email: string;
@@ -73,6 +75,13 @@ export const UserModal: React.FC<UserModalProps> = ({
     stickersAdded: number;
   }
   const [inviteLog, setInviteLog] = useState<InviteLogEntry[]>([]);
+  // Issue #43: control de tema claro/oscuro dentro del panel de usuario
+  const [theme, setTheme] = useState<Theme>('dark');
+  const toggleTheme = () => {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    applyTheme(next);
+  };
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -122,6 +131,8 @@ export const UserModal: React.FC<UserModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setActionMsg(null);
+      // Issue #43: refleja el tema vigente (puede haber cambiado en otra pestaña)
+      setTheme(getStoredTheme());
       loadData();
     }
   }, [isOpen, loadData]);
@@ -324,6 +335,18 @@ export const UserModal: React.FC<UserModalProps> = ({
                 onClick={() => setLocale('en')}
               >
                 EN
+              </button>
+              {/* Issue #43: única opción para cambiar entre tema claro y oscuro */}
+              <button
+                type="button"
+                className="filter-pill"
+                style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                onClick={toggleTheme}
+                title={theme === 'dark' ? t.themeLight : t.themeDark}
+                aria-label={theme === 'dark' ? t.themeLight : t.themeDark}
+              >
+                {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+                <span>{theme === 'dark' ? t.themeDarkShort : t.themeLightShort}</span>
               </button>
             </div>
           </div>
