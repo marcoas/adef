@@ -38,46 +38,48 @@ export const StickerModal: React.FC<StickerModalProps> = ({
   albumId = null,
 }) => {
   const t = getTranslation(locale);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   if (!isOpen || slotNumber === null) return null;
 
   const formattedSlot = slotNumber.toString().padStart(3, '0');
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ 
-              fontFamily: 'Space Mono', 
-              fontSize: '1.25rem', 
-              fontWeight: 800, 
-              color: sticker ? 'var(--accent-emerald)' : 'var(--text-muted)' 
-            }}>
-              #{formattedSlot}
-            </span>
-            <h2 className="modal-title">
-              {sticker ? `Patente ${sticker.rawPlate}` : t.emptySlot}
-            </h2>
-          </div>
-          <button className="close-btn" onClick={onClose}>
-            <X size={20} />
-          </button>
-        </div>
-
-        {sticker ? (
-          <div>
-            <div 
-              style={{ position: 'relative', width: '100%', aspectRatio: '16/9', marginBottom: '1.25rem', cursor: 'pointer' }}
-              onClick={() => window.open(sticker.imageUrl, '_blank')}
-              title="Haz clic para ver la foto a tamaño real"
-            >
-              <img 
-                src={sticker.imageUrl} 
-                alt={`Patente ${sticker.rawPlate}`} 
-                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--radius-md)' }}
-              />
+    <>
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <span style={{ 
+                fontFamily: 'Space Mono', 
+                fontSize: '1.25rem', 
+                fontWeight: 800, 
+                color: sticker ? 'var(--accent-emerald)' : 'var(--text-muted)' 
+              }}>
+                #{formattedSlot}
+              </span>
+              <h2 className="modal-title">
+                {sticker ? `Patente ${sticker.rawPlate}` : t.emptySlot}
+              </h2>
             </div>
+            <button className="close-btn" onClick={onClose}>
+              <X size={20} />
+            </button>
+          </div>
+
+          {sticker ? (
+            <div>
+              <div 
+                style={{ position: 'relative', width: '100%', aspectRatio: '16/9', marginBottom: '1.25rem', cursor: 'zoom-in' }}
+                onClick={() => setIsFullscreen(true)}
+                title="Haz clic para ampliar y ver la foto a tamaño completo"
+              >
+                <img 
+                  src={sticker.imageUrl} 
+                  alt={`Patente ${sticker.rawPlate}`} 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--radius-md)' }}
+                />
+              </div>
 
             <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
@@ -160,6 +162,41 @@ export const StickerModal: React.FC<StickerModalProps> = ({
           </div>
         )}
       </div>
-    </div>
+
+      {/* Issue #23: Visualización a tamaño real con botón claro para volver al álbum / cerrar */}
+      {isFullscreen && sticker && (
+        <div 
+          className="modal-overlay" 
+          style={{ zIndex: 200, background: 'rgba(0, 0, 0, 0.95)', padding: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setIsFullscreen(false)}
+        >
+          <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', display: 'flex', gap: '0.75rem', zIndex: 210 }}>
+            <button 
+              type="button" 
+              className="btn-primary" 
+              onClick={() => setIsFullscreen(false)}
+              style={{ padding: '0.6rem 1.2rem', gap: '0.5rem', background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-cyan))', color: '#000', fontWeight: 700 }}
+            >
+              <X size={20} />
+              <span>Volver al Álbum</span>
+            </button>
+          </div>
+
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            style={{ maxWidth: '95vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+          >
+            <img 
+              src={sticker.imageUrl} 
+              alt={`Patente ${sticker.rawPlate}`} 
+              style={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain', borderRadius: 'var(--radius-md)', boxShadow: '0 0 40px rgba(0, 242, 254, 0.2)' }}
+            />
+            <div style={{ marginTop: '1rem', color: '#FFF', fontSize: '0.95rem', fontFamily: 'Space Mono', background: 'rgba(255,255,255,0.1)', padding: '0.4rem 1rem', borderRadius: '999px', backdropFilter: 'blur(8px)' }}>
+              Patente: <strong>{sticker.rawPlate}</strong> · Casillero #{formattedSlot}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
