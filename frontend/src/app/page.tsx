@@ -147,6 +147,8 @@ export default function HomePage() {
     await fetchAlbumFromPostgreSQL(albumId);
   };
 
+  const [recentAddedSlot, setRecentAddedSlot] = useState<number | null>(null);
+
   const handleStickerAdded = (slotNumber: number, rawPlate: string, imageUrl: string) => {
     setStickers((prev) => ({
       ...prev,
@@ -158,6 +160,8 @@ export default function HomePage() {
         capturedBy: userSession ? userSession.name : 'Coleccionista de Patentes',
       },
     }));
+    setRecentAddedSlot(slotNumber);
+    setTimeout(() => setRecentAddedSlot(null), 800);
     // Re-sincronizar con PostgreSQL
     fetchAlbumFromPostgreSQL();
   };
@@ -217,6 +221,7 @@ export default function HomePage() {
         albums={albums}
         activeAlbumId={activeAlbumId}
         onChangeAlbum={handleChangeAlbum}
+        recentAddedSlot={recentAddedSlot}
       />
 
       {/* Modal de Captura de Fotos / OCR Real */}

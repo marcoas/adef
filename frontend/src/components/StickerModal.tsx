@@ -39,6 +39,7 @@ export const StickerModal: React.FC<StickerModalProps> = ({
 }) => {
   const t = getTranslation(locale);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPeeling, setIsPeeling] = useState(false);
 
   if (!isOpen || slotNumber === null) return null;
 
@@ -71,6 +72,7 @@ export const StickerModal: React.FC<StickerModalProps> = ({
             <div>
               <div 
                 style={{ position: 'relative', width: '100%', aspectRatio: '16/9', marginBottom: '1.25rem', cursor: 'zoom-in' }}
+                className={isPeeling ? "animate-peel" : ""}
                 onClick={() => setIsFullscreen(true)}
                 title="Haz clic para ampliar y ver la foto a tamaño completo"
               >
@@ -120,8 +122,13 @@ export const StickerModal: React.FC<StickerModalProps> = ({
                       } catch (err) {
                         console.error('Error al eliminar figurita:', err);
                       }
-                      onStickerDeleted(slotNumber);
-                      onClose();
+                      
+                      setIsPeeling(true);
+                      setTimeout(() => {
+                        onStickerDeleted(slotNumber);
+                        onClose();
+                        setIsPeeling(false);
+                      }, 600);
                     }
                   }}
                   style={{ 

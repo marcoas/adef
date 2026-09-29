@@ -162,44 +162,6 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>{t.userPanel}</span>
                   </button>
 
-                  {/* Opción 2: Invitar Asociados */}
-                  <button
-                    type="button"
-                    className="user-dropdown-item"
-                    onClick={() => {
-                      setIsDropdownOpen(false);
-                      onOpenInvite();
-                    }}
-                  >
-                    <Users size={16} style={{ color: 'var(--accent-blue)' }} />
-                    <span>{t.invitePartner}</span>
-                  </button>
-
-                  {/* Opción 3: Ver y Revocar Invitaciones */}
-                  <button
-                    type="button"
-                    className="user-dropdown-item"
-                    onClick={() => {
-                      setIsDropdownOpen(false);
-                      onOpenUserModal();
-                    }}
-                  >
-                    <ShieldCheck size={16} style={{ color: 'var(--accent-emerald)' }} />
-                    <span>{t.manageInvites}</span>
-                  </button>
-
-                  {/* Opción 4: Cambiar Idioma */}
-                  <button
-                    type="button"
-                    className="user-dropdown-item"
-                    onClick={() => {
-                      setLocale(locale === 'es' ? 'en' : 'es');
-                    }}
-                  >
-                    <Globe size={16} style={{ color: 'var(--accent-amber)' }} />
-                    <span>{t.changeLanguage} ({locale === 'es' ? 'EN' : 'ES'})</span>
-                  </button>
-
                   <div className="user-dropdown-divider" />
 
                   {/* Opción 5: Cerrar Sesión */}

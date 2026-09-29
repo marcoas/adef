@@ -27,6 +27,7 @@ interface AlbumGridProps {
   albums?: AlbumOption[];
   activeAlbumId?: string | null;
   onChangeAlbum?: (albumId: string) => void;
+  recentAddedSlot?: number | null;
 }
 
 export const AlbumGrid: React.FC<AlbumGridProps> = ({
@@ -38,6 +39,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
   albums = [],
   activeAlbumId = null,
   onChangeAlbum,
+  recentAddedSlot,
 }) => {
   const t = getTranslation(locale);
   const [searchTerm, setSearchTerm] = useState('');
@@ -111,69 +113,63 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
 
   return (
     <div>
-      {/* Issue #21: Unificar Álbum Activo + Combo Desplegable + Progreso del Álbum en un solo renglón */}
-      <div className="toolbar-container">
-        <div className="progress-card unified-header-row" style={{ opacity: userSession ? 1 : 0.45 }}>
-          {/* Selector de Álbum Activo */}
-          <div className="album-selector-group">
-            <BookOpen size={18} style={{ color: 'var(--accent-cyan)' }} />
-            <span style={{ fontSize: '0.95rem', fontWeight: 700, whiteSpace: 'nowrap' }}>Álbum Activo:</span>
-            <select 
-              value={activeAlbumId || 'own'} 
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === 'own') {
-                  setSelectedAlbum('own');
-                  const own = albums.find((a) => a.role === 'OWNER');
-                  if (own && onChangeAlbum) onChangeAlbum(own.id);
-                } else {
-                  setSelectedAlbum('shared');
-                  if (onChangeAlbum) onChangeAlbum(value);
-                }
-              }}
-              disabled={!userSession}
-              title={userSession ? undefined : 'Inicia sesión para ver tus álbumes'}
-              className="album-select-dropdown"
-            >
-              <option value="own" style={{ background: '#121827' }}>
-                {userSession ? `Álbum de ${userSession.name} (Propietario)` : 'Mi Álbum Principal'}
-              </option>
-              {albums
-                .filter((a) => a.role === 'ASSOCIATE')
-                .map((a) => (
-                  <option key={a.id} value={a.id} style={{ background: '#121827' }}>
-                    {a.title} (Invitado)
-                  </option>
-                ))}
-            </select>
-          </div>
-
-          {/* Progreso del Álbum en el mismo renglón */}
-          <div className="album-progress-group">
-            <div className="progress-info-text">
-              <Sparkles size={16} style={{ color: 'var(--accent-cyan)' }} />
-              <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{t.progressTitle}:</span>
-              <span style={{ fontFamily: 'Space Mono', fontWeight: 700, fontSize: '0.875rem' }}>
-                {userSession ? (
-                  <>
-                    <span style={{ color: 'var(--accent-cyan)' }}>{collectedCount}</span> / {TOTAL_SLOTS} ({progressPercentage}%)
-                  </>
-                ) : (
-                  'Inicia sesión'
-                )}
-              </span>
+      {/* Issue #21 & #28: Unificar Álbum Activo + Progreso y Ocultar si no hay sesión */}
+      {userSession && (
+        <div className="toolbar-container">
+          <div className="progress-card unified-header-row">
+            {/* Selector de Álbum Activo */}
+            <div className="album-selector-group">
+              <BookOpen size={18} style={{ color: 'var(--accent-cyan)' }} />
+              <span style={{ fontSize: '0.95rem', fontWeight: 700, whiteSpace: 'nowrap' }}>Álbum Activo:</span>
+              <select 
+                value={activeAlbumId || 'own'} 
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === 'own') {
+                    setSelectedAlbum('own');
+                    const own = albums.find((a) => a.role === 'OWNER');
+                    if (own && onChangeAlbum) onChangeAlbum(own.id);
+                  } else {
+                    setSelectedAlbum('shared');
+                    if (onChangeAlbum) onChangeAlbum(value);
+                  }
+                }}
+                className="album-select-dropdown"
+              >
+                <option value="own" style={{ background: '#121827' }}>
+                  {`Álbum de ${userSession.name} (Propietario)`}
+                </option>
+                {albums
+                  .filter((a) => a.role === 'ASSOCIATE')
+                  .map((a) => (
+                    <option key={a.id} value={a.id} style={{ background: '#121827' }}>
+                      {a.title} (Invitado)
+                    </option>
+                  ))}
+              </select>
             </div>
 
-            <div className="progress-bar-bg compact-progress">
-              <div 
-                className="progress-bar-fill" 
-                style={{ width: userSession ? `${progressPercentage}%` : '0%' }} 
-              />
-            </div>
-          </div>
+            {/* Progreso del Álbum en el mismo renglón */}
+            <div className="album-progress-group">
+              <div className="progress-info-text">
+                <Sparkles size={16} style={{ color: 'var(--accent-cyan)' }} />
+                <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{t.progressTitle}:</span>
+                <span style={{ fontFamily: 'Space Mono', fontWeight: 700, fontSize: '0.875rem' }}>
+                  <span style={{ color: 'var(--accent-cyan)' }}>{collectedCount}</span> / {TOTAL_SLOTS} ({progressPercentage}%)
+                </span>
+              </div>
 
+              <div className="progress-bar-bg compact-progress">
+                <div 
+                  className="progress-bar-fill" 
+                  style={{ width: `${progressPercentage}%` }} 
+                />
+              </div>
+            </div>
+
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Issue #16: Barra de Filtros & Búsqueda SIEMPRE VISIBLE al hacer scroll (Sticky) */}
       <div className="sticky-controls-bar">
@@ -291,7 +287,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                   <img 
                     src={sticker.thumbnailUrl || sticker.imageUrl} 
                     alt={`Patente ${sticker.rawPlate}`} 
-                    className="sticker-image"
+                    className={`sticker-image ${recentAddedSlot === slot ? 'animate-paste' : ''}`}
                     loading="lazy"
                     decoding="async"
                   />

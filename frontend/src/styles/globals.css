@@ -152,20 +152,29 @@ body {
   box-shadow: var(--glass-glow);
 }
 
-/* Issue #21: Header unificado en un solo renglón */
+/* Issue #21 & #28: Álbum Activo + Progreso en un mismo renglón sin solapamiento.
+   Se usa CSS Grid de dos columnas (50% / 50%) para garantizar que ambos
+   bloques (`.album-selector-group` y `.album-progress-group`) no se solapen. */
 .unified-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 1.25rem;
-  flex-wrap: wrap;
+  align-items: center;
   padding: 0.75rem 1.25rem;
+}
+
+@media (max-width: 768px) {
+  .unified-header-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
 }
 
 .album-selector-group {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  justify-content: flex-start;
 }
 
 .album-select-dropdown {
@@ -177,6 +186,8 @@ body {
   font-size: 0.9rem;
   outline: none;
   transition: border-color 0.2s ease;
+  min-width: 180px;
+  max-width: 100%;
 }
 
 .album-select-dropdown:focus {
@@ -186,9 +197,7 @@ body {
 .album-progress-group {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  flex: 1;
-  min-width: 260px;
+  gap: 0.75rem;
   justify-content: flex-end;
 }
 
@@ -199,9 +208,10 @@ body {
   white-space: nowrap;
 }
 
+/* Issue #28: barra de progreso achicata para no forzar overflow */
 .compact-progress {
-  width: 140px;
-  height: 8px;
+  width: 100px;
+  height: 6px;
   flex-shrink: 0;
 }
 
@@ -664,4 +674,46 @@ body {
 
 .close-btn:hover {
   color: #FFF;
+}
+
+/* Issue #30: Efecto pegar/despegar figurita */
+@keyframes paste-sticker {
+  0% {
+    transform-origin: bottom right;
+    transform: scale(1.5) rotate3d(1, -1, 0, 45deg) translate(-10px, -10px);
+    opacity: 0;
+    box-shadow: 20px 20px 30px rgba(0, 0, 0, 0.5);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform-origin: bottom right;
+    transform: scale(1) rotate3d(0, 0, 0, 0deg) translate(0, 0);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+}
+
+@keyframes peel-sticker {
+  0% {
+    transform-origin: bottom right;
+    transform: scale(1) rotate3d(0, 0, 0, 0deg) translate(0, 0);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    opacity: 1;
+  }
+  100% {
+    transform-origin: bottom right;
+    transform: scale(1.5) rotate3d(1, -1, 0, 60deg) translate(-20px, -20px);
+    opacity: 0;
+    box-shadow: 30px 30px 40px rgba(0, 0, 0, 0.6);
+  }
+}
+
+.animate-paste {
+  animation: paste-sticker 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.animate-peel {
+  animation: peel-sticker 0.6s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+  z-index: 50 !important;
 }

@@ -211,10 +211,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             className="btn-secondary"
             onClick={() => handleOAuthLogin('google')}
             disabled={isLoading}
-            style={{ 
+                        style={{ 
               width: '100%', 
-              justify: 'center', 
-              background: '#FFFFFF', 
+              justifyContent: 'center', 
+              background: '#FFFFFF',  
               color: '#1F2937', 
               fontWeight: 700,
               padding: '0.75rem 1rem'
@@ -236,7 +236,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             disabled={isLoading}
             style={{ 
               width: '100%', 
-              justify: 'center', 
+              justifyContent: 'center', 
               background: '#1877F2', 
               color: '#FFFFFF', 
               borderColor: '#1877F2',
@@ -260,7 +260,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             disabled={isLoading}
             style={{ 
               width: '100%', 
-              justify: 'center', 
+              justifyContent: 'center', 
               background: '#24292E', 
               color: '#FFFFFF', 
               borderColor: '#24292E',
