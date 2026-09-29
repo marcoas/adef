@@ -508,7 +508,11 @@ app.get(['/api/album/invites', '/api/invites'], requireAuth, async (req: Request
     const { album } = context;
 
     const invites = await prisma.albumInvite.findMany({
-      where: { albumId: album.id },
+      where: { 
+        albumId: album.id,
+        usedAt: null,
+        expiresAt: { gt: new Date() }
+      },
       orderBy: { createdAt: 'desc' },
       take: 10,
     });
