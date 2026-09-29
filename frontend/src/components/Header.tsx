@@ -104,7 +104,6 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
           <div>
             <h1 className="brand-title">{t.appTitle}</h1>
-            <p className="brand-subtitle">{t.appSubtitle}</p>
           </div>
         </div>
 

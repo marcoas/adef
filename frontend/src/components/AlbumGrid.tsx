@@ -202,7 +202,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
               <input 
                 type="text" 
                 className="search-input compact-input"
-                placeholder={t.searchNumber}
+                placeholder=""
                 maxLength={3}
                 inputMode="numeric"
                 value={searchTerm}
