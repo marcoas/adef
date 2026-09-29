@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { createWorker } from 'tesseract.js';
 import { extractPlate } from './utils/plateExtractor';
 import { recognizePlateALPR } from './services/alprService';
-import { storeImage, deleteStoredImages, UPLOADS_DIR } from './services/imageStorage';
+import { storeImage, deleteStoredImages, UPLOADS_DIR } from './services/images';
 
 dotenv.config();
 
@@ -373,10 +373,18 @@ app.post('/api/album/stickers', requireAuth, async (req: Request, res: Response)
       });
     }
 
-    // Issue #10 + #11: validar la imagen, guardarla en disco y generar miniatura
+    // Issue #10 + #35: validar la imagen y guardarla con el proveedor activo
+    // (Cloudinary o disco local según `IMAGE_PROVIDER`)
     let storedImage: { imageUrl: string; thumbnailUrl: string } | null = null;
     if (imageUrl && /^data:/i.test(imageUrl)) {
-      storedImage = await storeImage(imageUrl, `${req.protocol}://${req.get('host')}`);
+      try {
+        storedImage = await storeImage(imageUrl, `${req.protocol}://${req.get('host')}`);
+      } catch (err) {
+        console.error('Error al almacenar la imagen:', err);
+        return res.status(502).json({
+          error: 'No se pudo guardar la imagen en el almacenamiento. Inténtalo de nuevo.',
+        });
+      }
       if (!storedImage) {
         return res.status(415).json({
           error: 'Formato de imagen no permitido. Solo se aceptan JPG o PNG.',
@@ -491,8 +499,9 @@ app.delete('/api/album/stickers/:slotNumber', requireAuth, async (req: Request, 
       }),
     ]);
 
-    // Issue #11: limpiar también los archivos del disco
-    deleteStoredImages(existingSticker.imageUrl, existingSticker.thumbnailUrl);
+    // Issue #35: limpiar también las imágenes en el proveedor activo
+    // (cada proveedor ignora las URLs que no le pertenecen)
+    await deleteStoredImages(existingSticker.imageUrl, existingSticker.thumbnailUrl);
 
     return res.json({ message: `Figurita #${slotNumber} eliminada con éxito.` });
   } catch (error) {

@@ -39,6 +39,14 @@ services:
       JWT_SECRET: ${JWT_SECRET:-super_secret_jwt_key_patentes_2026_change_me}
       FRONTEND_URL: http://localhost:3000
       PLATE_RECOGNIZER_TOKEN: ${PLATE_RECOGNIZER_TOKEN}
+      MAX_IMAGE_SIZE_MB: ${MAX_IMAGE_SIZE_MB:-5}
+      # Proveedor de imágenes: "local" (disco del backend) o "cloudinary".
+      # Con "cloudinary" se requieren las 3 credenciales de abajo.
+      IMAGE_PROVIDER: ${IMAGE_PROVIDER:-local}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      CLOUDINARY_FOLDER: ${CLOUDINARY_FOLDER:-album-patentes}
     depends_on:
       postgres:
         condition: service_healthy
