@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Sparkles, Lock, BookOpen } from 'lucide-react';
+import { Search, Sparkles, Lock, BookOpen, ArrowUp, ArrowLeftRight, CheckCircle2, CircleDashed, X } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 import { StickerData } from './StickerModal';
 
@@ -43,6 +43,20 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'collected' | 'missing'>('all');
   const [selectedAlbum, setSelectedAlbum] = useState<'own' | 'shared'>('own');
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  // Issue #16: botón flotante al pie para scroll rápido hacia el inicio
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 250);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // Issue #7: sin sesión no existe "el álbum del usuario"; se limpian los filtros
   // locales (búsqueda, filtro, álbum seleccionado) al cerrar sesión.
@@ -56,6 +70,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
 
   const TOTAL_SLOTS = 1000;
   const collectedCount = Object.keys(stickers).length;
+  const missingCount = TOTAL_SLOTS - collectedCount;
   const progressPercentage = ((collectedCount / TOTAL_SLOTS) * 100).toFixed(1);
 
   // Generar array de 000 a 999
@@ -71,6 +86,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
 
       // Filtro por búsqueda de texto/número
       const matchesSearch = 
+        !searchTerm ||
         formattedNumber.includes(searchTerm) ||
         (sticker && sticker.rawPlate.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -83,9 +99,19 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
     });
   }, [slots, stickers, searchTerm, filterType]);
 
+  // Issue #13: alternar de forma interactiva entre pegadas y faltantes
+  const toggleCollectedMissing = () => {
+    if (!userSession) return;
+    if (filterType === 'collected') {
+      setFilterType('missing');
+    } else {
+      setFilterType('collected');
+    }
+  };
+
   return (
     <div>
-      {/* Bar de Progreso & Selector de Álbumes */}
+      {/* Barra de Progreso & Selector de Álbumes */}
       <div className="toolbar-container">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -164,47 +190,92 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
             />
           </div>
         </div>
+      </div>
 
-        {/* Buscador y Filtros */}
-        <div className="controls-row" style={{ opacity: userSession ? 1 : 0.45 }}>
-          <div className="search-input-wrapper">
-            <Search size={18} className="search-icon" />
-            <input 
-              type="text" 
-              className="search-input"
-              placeholder={t.searchPlaceholder}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              disabled={!userSession}
-              title={userSession ? undefined : 'Inicia sesión para buscar en tu álbum'}
-            />
-          </div>
+      {/* Issue #16: Barra de Filtros & Búsqueda SIEMPRE VISIBLE al hacer scroll (Sticky) */}
+      <div className="sticky-controls-bar">
+        <div className="sticky-controls-inner">
+          <div className="controls-row" style={{ opacity: userSession ? 1 : 0.45 }}>
+            {/* Issue #14: Cuadro de búsqueda achicado (hasta 3 dígitos) */}
+            <div className="search-input-wrapper compact-search">
+              <Search size={15} className="search-icon" />
+              <input 
+                type="text" 
+                className="search-input compact-input"
+                placeholder={t.searchNumber}
+                maxLength={3}
+                inputMode="numeric"
+                value={searchTerm}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9a-zA-Z]/g, '').slice(0, 3);
+                  setSearchTerm(val);
+                }}
+                disabled={!userSession}
+                title={userSession ? 'Buscar por número de 3 dígitos (ej: 042)' : 'Inicia sesión para buscar en tu álbum'}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  className="search-clear-btn"
+                  onClick={() => setSearchTerm('')}
+                  title="Limpiar búsqueda"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
 
-          <div className="filter-pills">
-            <button 
-              className={`filter-pill ${filterType === 'all' ? 'active' : ''}`}
-              onClick={() => setFilterType('all')}
-              disabled={!userSession}
-              title={userSession ? undefined : 'Inicia sesión para filtrar tu álbum'}
-            >
-              {t.filterAll}
-            </button>
-            <button 
-              className={`filter-pill ${filterType === 'collected' ? 'active' : ''}`}
-              onClick={() => setFilterType('collected')}
-              disabled={!userSession}
-              title={userSession ? undefined : 'Inicia sesión para filtrar tu álbum'}
-            >
-              {t.filterCollected} ({userSession ? collectedCount : 0})
-            </button>
-            <button 
-              className={`filter-pill ${filterType === 'missing' ? 'active' : ''}`}
-              onClick={() => setFilterType('missing')}
-              disabled={!userSession}
-              title={userSession ? undefined : 'Inicia sesión para filtrar tu álbum'}
-            >
-              {t.filterMissing} ({userSession ? TOTAL_SLOTS - collectedCount : TOTAL_SLOTS})
-            </button>
+            {/* Issue #13 & #14: Botones de filtrado con botón/switch unificado Pegadas/Faltantes */}
+            <div className="filter-pills-group">
+              {/* Botón Todas */}
+              <button 
+                type="button"
+                className={`filter-pill ${filterType === 'all' ? 'active' : ''}`}
+                onClick={() => setFilterType('all')}
+                disabled={!userSession}
+                title={userSession ? undefined : 'Inicia sesión para filtrar tu álbum'}
+              >
+                {t.filterAll}
+              </button>
+
+              {/* Issue #13: Botón / Switch unificado interactivo para Pegadas / Faltantes */}
+              <div 
+                className={`unified-toggle-container ${filterType !== 'all' ? 'active' : ''}`}
+                title={userSession ? 'Alternar entre Pegadas y Faltantes' : undefined}
+              >
+                <button
+                  type="button"
+                  className={`unified-toggle-segment ${filterType === 'collected' ? 'selected collected-active' : ''}`}
+                  onClick={() => setFilterType('collected')}
+                  disabled={!userSession}
+                  title="Mostrar figuritas pegadas"
+                >
+                  <CheckCircle2 size={14} className="segment-icon" />
+                  <span>{t.filterCollected} ({userSession ? collectedCount : 0})</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="unified-toggle-switch-btn"
+                  onClick={toggleCollectedMissing}
+                  disabled={!userSession}
+                  title="Alternar entre Pegadas y Faltantes"
+                >
+                  <ArrowLeftRight size={13} />
+                </button>
+
+                <button
+                  type="button"
+                  className={`unified-toggle-segment ${filterType === 'missing' ? 'selected missing-active' : ''}`}
+                  onClick={() => setFilterType('missing')}
+                  disabled={!userSession}
+                  title="Mostrar casilleros faltantes"
+                >
+                  <CircleDashed size={14} className="segment-icon" />
+                  <span>{t.filterMissing} ({userSession ? missingCount : TOTAL_SLOTS})</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -263,6 +334,19 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
           );
         })}
       </div>
+
+      {/* Issue #16: Botón flotante al pie de pantalla para volver al inicio */}
+      {showScrollTop && (
+        <button
+          type="button"
+          className="floating-scroll-top"
+          onClick={scrollToTop}
+          title={t.scrollToTop}
+          aria-label={t.scrollToTop}
+        >
+          <ArrowUp size={22} />
+        </button>
+      )}
     </div>
   );
 };

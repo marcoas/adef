@@ -529,6 +529,71 @@ app.get('/api/album/invites', requireAuth, async (req: Request, res: Response) =
   }
 });
 
+app.delete('/api/album/invites/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as AuthedRequest).authUserId!;
+    const context = await getOrCreateUserAlbum(userId);
+    if (!context) return res.status(401).json({ error: 'Usuario no encontrado.' });
+    const { album } = context;
+
+    const invite = await prisma.albumInvite.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!invite || invite.albumId !== album.id) {
+      return res.status(404).json({ error: 'Invitación no encontrada.' });
+    }
+
+    await prisma.albumInvite.delete({
+      where: { id: req.params.id },
+    });
+
+    return res.json({ message: 'Invitación revocada con éxito.' });
+  } catch (error) {
+    console.error('Error al revocar invitación:', error);
+    return res.status(500).json({ error: 'Error al revocar la invitación' });
+  }
+});
+
+app.get('/api/album/members', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as AuthedRequest).authUserId!;
+    const context = await getOrCreateUserAlbum(userId);
+    if (!context) return res.status(401).json({ error: 'Usuario no encontrado.' });
+    const { album } = context;
+
+    const members = await prisma.albumMember.findMany({
+      where: { albumId: album.id },
+      include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
+      orderBy: { joinedAt: 'desc' },
+    });
+
+    return res.json({ members });
+  } catch (error) {
+    console.error('Error al listar miembros del álbum:', error);
+    return res.status(500).json({ error: 'Error al listar los miembros' });
+  }
+});
+
+app.delete('/api/album/members/:memberUserId', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as AuthedRequest).authUserId!;
+    const context = await getOrCreateUserAlbum(userId);
+    if (!context) return res.status(401).json({ error: 'Usuario no encontrado.' });
+    const { album } = context;
+
+    const { memberUserId } = req.params;
+    await prisma.albumMember.deleteMany({
+      where: { albumId: album.id, userId: memberUserId },
+    });
+
+    return res.json({ message: 'Miembro revocado del álbum con éxito.' });
+  } catch (error) {
+    console.error('Error al revocar miembro:', error);
+    return res.status(500).json({ error: 'Error al revocar el miembro del álbum' });
+  }
+});
+
 // Vista previa del link (pública): quién invitó y a qué álbum
 app.get('/api/invites/:token', async (req: Request, res: Response) => {
   try {

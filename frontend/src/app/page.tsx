@@ -8,6 +8,7 @@ import { UploadModal } from '../components/UploadModal';
 import { StickerModal, StickerData } from '../components/StickerModal';
 import { LoginModal } from '../components/LoginModal';
 import { InviteModal } from '../components/InviteModal';
+import { UserModal } from '../components/UserModal';
 import { Locale } from '../lib/i18n';
 
 interface UserSession {
@@ -22,6 +23,7 @@ export default function HomePage() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [uploadTargetSlot, setUploadTargetSlot] = useState<number | null>(null);
   const [userSession, setUserSession] = useState<UserSession | null>(null);
@@ -178,6 +180,7 @@ export default function HomePage() {
     localStorage.removeItem('user_session');
     localStorage.removeItem('jwt_token');
     setUserSession(null);
+    setIsUserModalOpen(false);
     // Issue #7: al cerrar sesión se limpian stickers (progreso/candados) en el effect
   };
 
@@ -192,18 +195,19 @@ export default function HomePage() {
 
   return (
     <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Header Principal con Auth */}
+      {/* Header Principal con Auth y Menú de Usuario (Issue #15) */}
       <Header 
         locale={locale} 
         setLocale={setLocale} 
         onOpenUpload={handleOpenUpload}
         onOpenLogin={() => setIsLoginOpen(true)}
         onOpenInvite={() => setIsInviteOpen(true)}
+        onOpenUserModal={() => setIsUserModalOpen(true)}
         onLogout={handleLogout}
         userSession={userSession}
       />
 
-      {/* Rejilla de Figuritas del Álbum 000-999 */}
+      {/* Rejilla de Figuritas del Álbum 000-999 con Controles Sticky (Issue #16), Filtro Unificado (Issue #13) y Buscador Compacto (Issue #14) */}
       <AlbumGrid 
         locale={locale}
         stickers={stickers}
@@ -263,6 +267,17 @@ export default function HomePage() {
         isOpen={isInviteOpen}
         onClose={() => setIsInviteOpen(false)}
         locale={locale}
+      />
+
+      {/* Issue #15: Panel de Usuario para logout, cambiar idioma, ver y revocar invitaciones */}
+      <UserModal
+        isOpen={isUserModalOpen}
+        onClose={() => setIsUserModalOpen(false)}
+        locale={locale}
+        setLocale={setLocale}
+        userSession={userSession}
+        onLogout={handleLogout}
+        onOpenInviteModal={() => setIsInviteOpen(true)}
       />
     </main>
   );
