@@ -235,7 +235,7 @@ body {
 }
 
 .progress-bar-bg {
-  width: 100%;
+  width: 25%;
   height: 12px;
   background: rgba(255, 255, 255, 0.08);
   border-radius: 999px;
@@ -694,26 +694,91 @@ body {
   }
 }
 
-@keyframes peel-sticker {
-  0% {
-    transform-origin: bottom right;
-    transform: scale(1) rotate3d(0, 0, 0, 0deg) translate(0, 0);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    opacity: 1;
-  }
-  100% {
-    transform-origin: bottom right;
-    transform: scale(1.5) rotate3d(1, -1, 0, 60deg) translate(-20px, -20px);
-    opacity: 0;
-    box-shadow: 30px 30px 40px rgba(0, 0, 0, 0.6);
-  }
+/* Issue #28/#30: animación de despegue (peel) de la figurita al eliminarse.
+   Inspirado en el demo "peelable": la esquina inferior-derecha se levanta
+   vía clip-path animado con @property, simulando el retiro de la pegatina. */
+@property --peel-p {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
+.peelable {
+  --peel-p: 0px;
+  --peel-a: calc(var(--peel-w, 300px) + var(--peel-h, 200px) - var(--peel-p));
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/ 9;
+  transition: --peel-p 0.6s cubic-bezier(0.55, 0.05, 0.35, 1);
+}
+.peelable.is-peeled {
+  --peel-p: calc(var(--peel-w, 300px) + var(--peel-h, 200px));
+}
+
+.peelable__content {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.55);
+  border-radius: var(--radius-md);
+}
+
+.peelable__sticker {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35));
+}
+
+.peelable__cover {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  clip-path: polygon(
+    0px 0px,
+    min(var(--peel-a), var(--peel-w, 300px)) 0px,
+    min(var(--peel-a), var(--peel-w, 300px)) max(var(--peel-a) - var(--peel-w, 300px), 0px),
+    max(var(--peel-a) - var(--peel-h, 200px), 0px) min(var(--peel-a), var(--peel-h, 200px)),
+    0px min(var(--peel-a), var(--peel-h, 200px))
+  );
+}
+
+.peelable__flap {
+  position: absolute;
+  left: calc(var(--peel-h, 200px) * -1);
+  top: calc(var(--peel-w, 300px) * -1);
+  width: calc(var(--peel-w, 300px) + var(--peel-h, 200px));
+  height: calc(var(--peel-w, 300px) + var(--peel-h, 200px));
+  background: linear-gradient(45deg, var(--accent-cyan), #c9c9c9);
+  clip-path: polygon(
+    var(--peel-a) var(--peel-a),
+    calc(min(var(--peel-a), var(--peel-w, 300px)) + var(--peel-h, 200px)) var(--peel-a),
+    calc(min(var(--peel-a), var(--peel-w, 300px)) + var(--peel-h, 200px)) calc(max(var(--peel-a) - var(--peel-w, 300px), 0px) + var(--peel-w, 300px)),
+    calc(max(var(--peel-a) - var(--peel-h, 200px), 0px) + var(--peel-h, 200px)) calc(min(var(--peel-a), var(--peel-h, 200px)) + var(--peel-w, 300px)),
+    var(--peel-a) calc(min(var(--peel-a), var(--peel-h, 200px)) + var(--peel-w, 300px))
+  );
+}
+
+.peelable.is-peeled .peelable__flap {
+  opacity: 0;
+  transition: opacity 0.3s ease 0.3s;
+}
+.peelable:not(.is-peeled) .peelable__flap {
+  opacity: 1;
+  transition: none;
+}
+.peelable.is-peeled .peelable__sticker {
+  visibility: hidden;
+  transition: visibility 0s 0.6s;
 }
 
 .animate-paste {
   animation: paste-sticker 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
-.animate-peel {
-  animation: peel-sticker 0.6s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
-  z-index: 50 !important;
+@media (prefers-reduced-motion: reduce) {
+  .peelable { transition-duration: 0.01s; }
 }

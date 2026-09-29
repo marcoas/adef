@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Calendar, User, CheckCircle2, Trash2 } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 
@@ -40,6 +40,16 @@ export const StickerModal: React.FC<StickerModalProps> = ({
   const t = getTranslation(locale);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPeeling, setIsPeeling] = useState(false);
+  const peelRef = useRef<HTMLDivElement>(null);
+
+  // Issue #28/#30: medir el contenedor para alimentar las variables CSS
+  // (--peel-w / --peel-h) que el clip-path del despegue necesita en px.
+  useEffect(() => {
+    if (!peelRef.current) return;
+    const { width, height } = peelRef.current.getBoundingClientRect();
+    peelRef.current.style.setProperty('--peel-w', `${Math.round(width)}px`);
+    peelRef.current.style.setProperty('--peel-h', `${Math.round(height)}px`);
+  }, [isOpen, sticker?.imageUrl]);
 
   if (!isOpen || slotNumber === null) return null;
 
@@ -70,17 +80,25 @@ export const StickerModal: React.FC<StickerModalProps> = ({
 
           {sticker ? (
             <div>
-              <div 
-                style={{ position: 'relative', width: '100%', aspectRatio: '16/9', marginBottom: '1.25rem', cursor: 'zoom-in' }}
-                className={isPeeling ? "animate-peel" : ""}
-                onClick={() => setIsFullscreen(true)}
+              <div
+                ref={peelRef}
+                className={`peelable ${isPeeling ? 'is-peeled' : ''}`}
+                style={{ marginBottom: '1.25rem', cursor: isPeeling ? 'default' : 'zoom-in' }}
+                onClick={() => { if (!isPeeling) setIsFullscreen(true); }}
                 title="Haz clic para ampliar y ver la foto a tamaño completo"
               >
-                <img 
-                  src={sticker.imageUrl} 
-                  alt={`Patente ${sticker.rawPlate}`} 
+                <div className="peelable__content">
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                    #{formattedSlot}
+                  </span>
+                </div>
+                <img
+                  className="peelable__sticker peelable__cover"
+                  src={sticker.imageUrl}
+                  alt={`Patente ${sticker.rawPlate}`}
                   style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--radius-md)' }}
                 />
+                <div className="peelable__flap" />
               </div>
 
             <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1.5rem' }}>
