@@ -283,18 +283,24 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
               }
             >
               {sticker && userSession ? (
-                <>
-                  <img 
-                    src={sticker.thumbnailUrl || sticker.imageUrl} 
-                    alt={`Patente ${sticker.rawPlate}`} 
-                    className={`sticker-image ${recentAddedSlot === slot ? 'animate-paste' : ''}`}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <div className="plate-badge">
-                    {sticker.rawPlate}
+                /* Issue #30: pegado con doblez diagonal (ver .pastable en globals.css) */
+                <div className={`pastable ${recentAddedSlot === slot ? 'animate-paste' : ''}`}>
+                  <div className="pastable__cover">
+                    <img 
+                      src={sticker.thumbnailUrl || sticker.imageUrl} 
+                      alt={`Patente ${sticker.rawPlate}`} 
+                      className="sticker-image"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <div className="plate-badge">
+                      {sticker.rawPlate}
+                    </div>
                   </div>
-                </>
+                  <div className="pastable__flapwrap">
+                    <div className="pastable__flap" />
+                  </div>
+                </div>
               ) : (
                 <span className="slot-number">{formattedSlot}</span>
               )}

@@ -676,24 +676,6 @@ body {
   color: #FFF;
 }
 
-/* Issue #30: Efecto pegar/despegar figurita */
-@keyframes paste-sticker {
-  0% {
-    transform-origin: bottom right;
-    transform: scale(1.5) rotate3d(1, -1, 0, 45deg) translate(-10px, -10px);
-    opacity: 0;
-    box-shadow: 20px 20px 30px rgba(0, 0, 0, 0.5);
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    transform-origin: bottom right;
-    transform: scale(1) rotate3d(0, 0, 0, 0deg) translate(0, 0);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  }
-}
-
 /* Issue #28/#30: animación de despegue (peel) de la figurita al eliminarse.
    Inspirado en el demo "peelable": la esquina inferior-derecha se levanta
    vía clip-path animado con @property, simulando el retiro de la pegatina. */
@@ -701,6 +683,15 @@ body {
   syntax: '<length>';
   inherits: true;
   initial-value: 0px;
+}
+
+/* Issue #30: custom property animable del "pegado con doblez diagonal".
+   0 = solapa de papel completa (aún sin pegar) → 200 = foto completa (pegada).
+   Se registra como <number> para que el navegador interpole el clip-path. */
+@property --paste-s {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 200;
 }
 
 .peelable {
@@ -775,10 +766,105 @@ body {
   transition: visibility 0s 0.6s;
 }
 
-.animate-paste {
-  animation: paste-sticker 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+/* Issue #30: "pegado con doblez diagonal".
+   Inspirado en el demo "album-sticker-fold": al pegar, la foto se revela
+   doblando desde la esquina superior-izquierda (clip-path animado vía
+   @property) mientras la solapa muestra el dorso del papel.
+   Geometría 100% en % → responsiva y sin medir px por casillero. */
+.pastable {
+  --paste-s: 200; /* reposo = ya pegada (foto completa, solapa oculta) */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.pastable.animate-paste {
+  animation: paste-fold 0.75s cubic-bezier(0.2, 0.6, 0.25, 1) forwards;
+}
+
+@keyframes paste-fold {
+  0% {
+    --paste-s: 0;
+  }
+  100% {
+    --paste-s: 200;
+  }
+}
+
+/* Pliegue (x + y = s) normalizado a % del casillero:
+   s=0 → nada pegado · s=100 → anti-diagonal · s=200 → pegada del todo. */
+.pastable__cover {
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(
+    0 0,
+    calc(min(var(--paste-s), 100) * 1%) 0,
+    calc(min(var(--paste-s), 100) * 1%) calc(max(var(--paste-s) - 100, 0) * 1%),
+    calc(max(var(--paste-s) - 100, 0) * 1%) calc(min(var(--paste-s), 100) * 1%),
+    0 calc(min(var(--paste-s), 100) * 1%)
+  );
+}
+
+/* Sombra que proyecta la solapa sobre la parte ya pegada, siguiendo el pliegue. */
+.pastable__cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg,
+    transparent calc(var(--paste-s) * 0.7071% - 14%),
+    rgba(0, 0, 0, 0.28) calc(var(--paste-s) * 0.7071%));
+}
+
+/* Solapa: la parte suelta, doblada hacia atrás mostrando el reverso del papel.
+   El contenedor mide el doble que el casillero y su origen queda en (-100%,-100%),
+   por lo que una coordenada del casillero CX (0-100%) vale (CX + 100)/2 aquí. */
+.pastable__flapwrap {
+  position: absolute;
+  left: -100%;
+  top: -100%;
+  width: 200%;
+  height: 200%;
+  pointer-events: none;
+}
+
+/* Pentágono del demo (album-sticker-fold) con levantamiento q = 0.75:
+   el vértice interior se retrae para que la solapa no tape toda la esquina. */
+.pastable__flap {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.04) 0 2px, transparent 2px 7px),
+    linear-gradient(135deg,
+      #fdfbf6 calc((var(--paste-s) + 200) * 0.25% - 24%),
+      #ece6d9 calc((var(--paste-s) + 200) * 0.25% - 7%),
+      #bdb6a6 calc((var(--paste-s) + 200) * 0.25%));
+  clip-path: polygon(
+    calc((min(var(--paste-s), 100) + 100) * 0.5%)
+      calc((max(var(--paste-s) - 100, 0) + 100) * 0.5%),
+    calc((200 - 0.75 * max(100 - var(--paste-s), 0)) * 0.5%)
+      calc((100 + max(var(--paste-s) - 100, 0) - 0.75 * max(100 - var(--paste-s), 0)) * 0.5%),
+    calc((200 - 0.75 * (200 - var(--paste-s))) * 0.5%)
+      calc((200 - 0.75 * (200 - var(--paste-s))) * 0.5%),
+    calc((100 + max(var(--paste-s) - 100, 0) - 0.75 * max(100 - var(--paste-s), 0)) * 0.5%)
+      calc((200 - 0.75 * max(100 - var(--paste-s), 0)) * 0.5%),
+    calc((max(var(--paste-s) - 100, 0) + 100) * 0.5%)
+      calc((min(var(--paste-s), 100) + 100) * 0.5%)
+  );
+}
+
+/* Profundidad solo mientras se pega: nunca hay más de un casillero animándose,
+   así no se paga un `filter` permanente en las figuritas ya pegadas. */
+.pastable.animate-paste .pastable__cover {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+}
+.pastable.animate-paste .pastable__flapwrap {
+  filter: drop-shadow(2px 3px 4px rgba(0, 0, 0, 0.35));
 }
 
 @media (prefers-reduced-motion: reduce) {
   .peelable { transition-duration: 0.01s; }
+  .pastable.animate-paste { animation-duration: 0.01s; }
 }
