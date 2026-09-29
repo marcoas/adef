@@ -172,12 +172,6 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
             </div>
           </div>
 
-          {!userSession && (
-            <div className="no-session-badge">
-              <Lock size={14} />
-              <span>Inicia sesión para ver tu álbum</span>
-            </div>
-          )}
         </div>
       </div>
 
@@ -278,44 +272,33 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
           return (
             <div 
               key={slot}
-              className={`sticker-slot ${sticker ? 'collected' : ''}`}
+              className={`sticker-slot ${sticker ? 'collected' : ''} ${!userSession ? 'slot-disabled-no-session' : ''}`}
               onClick={() => {
-                if (!userSession && sticker) {
-                  onOpenLogin();
-                } else {
-                  onSlotClick(slot);
-                }
+                if (!userSession) return;
+                onSlotClick(slot);
               }}
+              style={!userSession ? { cursor: 'not-allowed', opacity: 0.35 } : undefined}
               title={
-                !userSession && sticker 
-                  ? `Inicia sesión para ver la foto de #${formattedSlot}` 
+                !userSession 
+                  ? `Casillero #${formattedSlot} (Inicia sesión para interactuar)` 
                   : sticker 
                   ? `Casillero #${formattedSlot}: ${sticker.rawPlate}` 
                   : `Casillero #${formattedSlot} Vacío`
               }
             >
-              {sticker ? (
-                userSession ? (
-                  <>
-                    {/* Issue #11: miniatura liviana + carga diferida para no
-                        bloquear la grilla cuando el álbum tiene muchas fotos */}
-                    <img 
-                      src={sticker.thumbnailUrl || sticker.imageUrl} 
-                      alt={`Patente ${sticker.rawPlate}`} 
-                      className="sticker-image"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                    <div className="plate-badge">
-                      {sticker.rawPlate}
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--accent-cyan)' }}>
-                    <Lock size={20} />
-                    <span style={{ fontSize: '0.75rem', marginTop: '4px', fontWeight: 600 }}>#{formattedSlot}</span>
+              {sticker && userSession ? (
+                <>
+                  <img 
+                    src={sticker.thumbnailUrl || sticker.imageUrl} 
+                    alt={`Patente ${sticker.rawPlate}`} 
+                    className="sticker-image"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <div className="plate-badge">
+                    {sticker.rawPlate}
                   </div>
-                )
+                </>
               ) : (
                 <span className="slot-number">{formattedSlot}</span>
               )}
