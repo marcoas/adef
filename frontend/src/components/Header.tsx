@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Users, Car, Globe, LogIn, UserCheck, LogOut, ChevronDown, User, ShieldCheck } from 'lucide-react';
+import { Camera, Users, Car, Globe, LogIn, UserCheck, LogOut, ChevronDown, User, ShieldCheck, History } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
+import { NotificationsBell, NotificationItem } from './NotificationsBell';
 
 interface UserSession {
   email: string;
@@ -20,6 +21,10 @@ interface HeaderProps {
   onOpenUserModal?: () => void;
   onLogout?: () => void;
   userSession: UserSession | null;
+  // Issue #33: acceso al log de movimientos
+  onOpenActivityLog?: () => void;
+  // Issue #34: abrir la figurita avisada por una notificación
+  onSelectNotification?: (notification: NotificationItem) => void;
 }
 
 // Issue #17: Iconos de proveedores OAuth para el botón de usuario
@@ -53,6 +58,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenUserModal = () => {},
   onLogout,
   userSession,
+  onOpenActivityLog,
+  onSelectNotification,
 }) => {
   const t = getTranslation(locale);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -108,6 +115,16 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="header-actions">
+          {/* Issue #34: campana de notificaciones de actividad del álbum */}
+          {userSession && (
+            <NotificationsBell
+              locale={locale}
+              userSession={userSession}
+              onOpenActivityLog={onOpenActivityLog}
+              onSelectNotification={onSelectNotification}
+            />
+          )}
+
           {/* Issue #15 & #17: Menú de usuario desplegable. Botón muestra SOLO el icono de usuario/OAuth */}
           {userSession ? (
             <div style={{ position: 'relative' }} ref={dropdownRef}>
@@ -161,6 +178,21 @@ export const Header: React.FC<HeaderProps> = ({
                     <User size={16} style={{ color: 'var(--accent-cyan)' }} />
                     <span>{t.userPanel}</span>
                   </button>
+
+                  {/* Issue #33: Log histórico de movimientos del álbum */}
+                  {onOpenActivityLog && (
+                    <button
+                      type="button"
+                      className="user-dropdown-item"
+                      onClick={() => {
+                        setIsDropdownOpen(false);
+                        onOpenActivityLog();
+                      }}
+                    >
+                      <History size={16} style={{ color: 'var(--accent-amber)' }} />
+                      <span>{t.activityLog}</span>
+                    </button>
+                  )}
 
                   <div className="user-dropdown-divider" />
 

@@ -9,6 +9,8 @@ import { StickerModal, StickerData } from '../components/StickerModal';
 import { LoginModal } from '../components/LoginModal';
 import { InviteModal } from '../components/InviteModal';
 import { UserModal } from '../components/UserModal';
+import { ActivityLogModal } from '../components/ActivityLogModal';
+import { NotificationItem } from '../components/NotificationsBell';
 import { Locale } from '../lib/i18n';
 
 interface UserSession {
@@ -32,6 +34,8 @@ export default function HomePage() {
   const [albums, setAlbums] = useState<AlbumOption[]>([]);
   const [activeAlbumId, setActiveAlbumId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Issue #33: log histórico de movimientos del álbum activo
+  const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
 
   // Issue #12: álbum activo según el rol del usuario en él
   const activeAlbum = albums.find((a) => a.id === activeAlbumId) || null;
@@ -148,6 +152,8 @@ export default function HomePage() {
   };
 
   const [recentAddedSlot, setRecentAddedSlot] = useState<number | null>(null);
+  // Issue #34: casillero a abrir cuando la notificación apunta a otro álbum
+  const [pendingNotificationSlot, setPendingNotificationSlot] = useState<number | null>(null);
 
   const handleStickerAdded = (slotNumber: number, rawPlate: string, imageUrl: string) => {
     setStickers((prev) => ({
@@ -180,6 +186,27 @@ export default function HomePage() {
     // El fetch del álbum lo dispara el effect que observa `userSession`
   };
 
+  // Issue #34: al hacer click en un aviso se abre la figurita avisada
+  const handleSelectNotification = async (notification: NotificationItem) => {
+    if (notification.slotNumber === null) return;
+
+    if (notification.albumId === activeAlbumId) {
+      setSelectedSlot(notification.slotNumber);
+      return;
+    }
+
+    // El aviso pertenece a otro álbum: primero se cambia de álbum
+    setPendingNotificationSlot(notification.slotNumber);
+    await handleChangeAlbum(notification.albumId);
+  };
+
+  useEffect(() => {
+    if (pendingNotificationSlot !== null && !isLoading) {
+      setSelectedSlot(pendingNotificationSlot);
+      setPendingNotificationSlot(null);
+    }
+  }, [pendingNotificationSlot, isLoading]);
+
   const handleLogout = () => {
     localStorage.removeItem('user_session');
     localStorage.removeItem('jwt_token');
@@ -209,6 +236,8 @@ export default function HomePage() {
         onOpenUserModal={() => setIsUserModalOpen(true)}
         onLogout={handleLogout}
         userSession={userSession}
+        onOpenActivityLog={() => setIsActivityLogOpen(true)}
+        onSelectNotification={handleSelectNotification}
       />
 
       {/* Rejilla de Figuritas del Álbum 000-999 con Controles Sticky (Issue #16), Filtro Unificado (Issue #13) y Buscador Compacto (Issue #14) */}
@@ -222,6 +251,7 @@ export default function HomePage() {
         activeAlbumId={activeAlbumId}
         onChangeAlbum={handleChangeAlbum}
         recentAddedSlot={recentAddedSlot}
+        onOpenActivityLog={() => setIsActivityLogOpen(true)}
       />
 
       {/* Modal de Captura de Fotos / OCR Real */}
@@ -283,6 +313,14 @@ export default function HomePage() {
         userSession={userSession}
         onLogout={handleLogout}
         onOpenInviteModal={() => setIsInviteOpen(true)}
+      />
+
+      {/* Issue #33: log histórico y cronológico de movimientos del álbum */}
+      <ActivityLogModal
+        isOpen={isActivityLogOpen}
+        onClose={() => setIsActivityLogOpen(false)}
+        locale={locale}
+        albumId={activeAlbumId}
       />
     </main>
   );

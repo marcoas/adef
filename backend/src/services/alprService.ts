@@ -32,7 +32,7 @@ export async function recognizePlateALPR(imageBase64: string): Promise<{ ocrText
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data: any = await response.json();
         console.log('🌐 Respuesta exitosa de Plate Recognizer API:', JSON.stringify(data.results));
 
         if (data.results && data.results.length > 0) {

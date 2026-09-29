@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Calendar, User, CheckCircle2, Trash2 } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
+import { ConfirmDialog } from './ConfirmDialog';
 
 export interface StickerData {
   slotNumber: number;
@@ -40,6 +41,10 @@ export const StickerModal: React.FC<StickerModalProps> = ({
   const t = getTranslation(locale);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPeeling, setIsPeeling] = useState(false);
+  // Issue #31: confirmación de eliminación mediante popup propio (sin window.confirm/alert)
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const peelRef = useRef<HTMLDivElement>(null);
 
   // Issue #28/#30: medir el contenedor para alimentar las variables CSS
@@ -54,6 +59,54 @@ export const StickerModal: React.FC<StickerModalProps> = ({
   if (!isOpen || slotNumber === null) return null;
 
   const formattedSlot = slotNumber.toString().padStart(3, '0');
+
+  // Issue #31: elimina la foto tras confirmar en el popup propio
+  const handleConfirmDelete = async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+      const jwtToken = localStorage.getItem('jwt_token');
+      const res = await fetch(
+        // Issue #12: indicar el álbum cuando es un álbum compartido
+        `${apiUrl}/album/stickers/${slotNumber}${albumId ? `?albumId=${albumId}` : ''}`,
+        {
+          method: 'DELETE',
+          headers: jwtToken ? { Authorization: `Bearer ${jwtToken}` } : {},
+        }
+      );
+
+      if (res.status === 401) {
+        setDeleteError(t.sessionExpired);
+        return;
+      }
+      if (res.status === 403) {
+        setDeleteError(t.ownerOnlyDelete);
+        return;
+      }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setDeleteError(data.error || 'No se pudo eliminar la figurita.');
+        return;
+      }
+    } catch (err) {
+      console.error('Error al eliminar figurita:', err);
+      setDeleteError('No se pudo eliminar la figurita. Reintenta en unos segundos.');
+      return;
+    } finally {
+      setIsDeleting(false);
+    }
+
+    // El popup se cierra y arranca la animación de despegue de la figurita
+    setIsConfirmOpen(false);
+    setIsPeeling(true);
+    setTimeout(() => {
+      onStickerDeleted?.(slotNumber);
+      onClose();
+      setIsPeeling(false);
+    }, 600);
+  };
 
   return (
     <>
@@ -116,38 +169,9 @@ export const StickerModal: React.FC<StickerModalProps> = ({
               {onStickerDeleted && isOwner && (
                 <button 
                   className="btn-secondary" 
-                  onClick={async () => {
-                    if (confirm(`¿Estás seguro de que deseas eliminar la foto del casillero #${formattedSlot}?`)) {
-                      try {
-                        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-                        const jwtToken = localStorage.getItem('jwt_token');
-                        const res = await fetch(
-                          // Issue #12: indicar el álbum cuando es un álbum compartido
-                          `${apiUrl}/album/stickers/${slotNumber}${albumId ? `?albumId=${albumId}` : ''}`,
-                          {
-                            method: 'DELETE',
-                            headers: jwtToken ? { Authorization: `Bearer ${jwtToken}` } : {},
-                          }
-                        );
-                        if (res.status === 401) {
-                          alert('Tu sesión expiró o no es válida. Inicia sesión nuevamente.');
-                          return;
-                        }
-                        if (res.status === 403) {
-                          alert('Solo el dueño del álbum puede eliminar figuritas.');
-                          return;
-                        }
-                      } catch (err) {
-                        console.error('Error al eliminar figurita:', err);
-                      }
-                      
-                      setIsPeeling(true);
-                      setTimeout(() => {
-                        onStickerDeleted(slotNumber);
-                        onClose();
-                        setIsPeeling(false);
-                      }, 600);
-                    }
+                  onClick={() => {
+                    setDeleteError(null);
+                    setIsConfirmOpen(true);
                   }}
                   style={{ 
                     color: '#EF4444', 
@@ -159,7 +183,7 @@ export const StickerModal: React.FC<StickerModalProps> = ({
                   }}
                 >
                   <Trash2 size={16} />
-                  <span>Eliminar Foto</span>
+                  <span>{t.deletePhoto}</span>
                 </button>
               )}
 
@@ -223,6 +247,34 @@ export const StickerModal: React.FC<StickerModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* Issue #31: popup de confirmación propio, con la estética del sitio */}
+      <ConfirmDialog
+        isOpen={isConfirmOpen}
+        locale={locale}
+        title={t.confirmDeleteTitle}
+        message={t.confirmDeleteMessage}
+        highlight={`#${formattedSlot}`}
+        hint={t.confirmDeleteHint}
+        confirmLabel={t.confirmDeleteBtn}
+        cancelLabel={t.cancel}
+        isProcessing={isDeleting}
+        errorMessage={deleteError}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => {
+          if (isDeleting) return;
+          setIsConfirmOpen(false);
+          setDeleteError(null);
+        }}
+      >
+        <div className="confirm-preview">
+          <img src={sticker?.thumbnailUrl || sticker?.imageUrl} alt={sticker ? `Patente ${sticker.rawPlate}` : ''} />
+          <div className="confirm-preview-info">
+            <span className="confirm-preview-plate">{sticker?.rawPlate}</span>
+            <span className="confirm-preview-slot">Casillero #{formattedSlot}</span>
+          </div>
+        </div>
+      </ConfirmDialog>
     </>
   );
 };

@@ -868,3 +868,634 @@ body {
   .peelable { transition-duration: 0.01s; }
   .pastable.animate-paste { animation-duration: 0.01s; }
 }
+
+/* =========================================================================
+   Issues #31 - #34: estilos de los componentes nuevos
+   ========================================================================= */
+
+/* Utilidades compartidas ------------------------------------------------- */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.btn-danger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #F87171;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.28);
+  border-color: #EF4444;
+  color: #FFF;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Issue #31: popup de confirmación de eliminación ------------------------ */
+.confirm-overlay {
+  z-index: 160;
+  background: rgba(4, 6, 12, 0.82);
+}
+
+.confirm-card {
+  max-width: 420px;
+  padding: 1.75rem 1.5rem 1.5rem;
+  text-align: center;
+  border-color: rgba(239, 68, 68, 0.35);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 34px rgba(239, 68, 68, 0.12);
+  animation: confirmPop 0.18s ease-out;
+}
+
+@keyframes confirmPop {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.confirm-close-btn {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  border-radius: var(--radius-sm);
+}
+
+.confirm-icon-badge {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #F87171;
+}
+
+.confirm-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+}
+
+.confirm-message {
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.confirm-highlight {
+  display: inline-block;
+  margin-left: 0.3rem;
+  font-family: 'Space Mono', monospace;
+  color: var(--accent-cyan);
+}
+
+.confirm-hint {
+  margin-top: 0.55rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.confirm-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--radius-sm);
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #FCA5A5;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+/* Vista previa de la figurita a eliminar (dentro del popup) */
+.confirm-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.6rem;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  text-align: left;
+}
+
+.confirm-preview img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.confirm-preview-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.confirm-preview-plate {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.confirm-preview-slot {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Issue #32: barra flotante de links rápidos ----------------------------- */
+.quick-jump-bar {
+  position: fixed;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 12px 7px;
+  border-radius: 999px;
+  background: rgba(11, 15, 25, 0.72);
+  border: 1px solid var(--border-color);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45);
+}
+
+.quick-jump-item {
+  min-width: 34px;
+  padding: 3px 4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: 'Space Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.quick-jump-item:hover {
+  color: var(--accent-cyan);
+  background: rgba(0, 242, 254, 0.12);
+}
+
+.quick-jump-item.active {
+  color: #000;
+  background: var(--accent-cyan);
+  font-weight: 700;
+  box-shadow: 0 0 12px rgba(0, 242, 254, 0.5);
+}
+
+/* La barra taparía la rejilla en pantallas angostas */
+@media (max-width: 1180px) {
+  .quick-jump-bar { display: none; }
+}
+
+/* Botón icono + label de la barra de controles (toolbar) */
+.toolbar-icon-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--accent-amber);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.toolbar-icon-btn:hover {
+  background: rgba(255, 179, 2, 0.14);
+  border-color: rgba(255, 179, 2, 0.5);
+}
+
+@media (max-width: 768px) {
+  .toolbar-icon-btn-label { display: none; }
+  .toolbar-icon-btn { padding: 0.5rem; }
+}
+
+/* Issue #33: log histórico de movimientos -------------------------------- */
+.activity-log-card {
+  max-width: 640px;
+}
+
+.activity-log-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+}
+
+.activity-log-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-left-width: 3px;
+  margin-bottom: 0.5rem;
+}
+
+.activity-log-item.paste {
+  border-left-color: var(--accent-emerald);
+}
+
+.activity-log-item.unpaste {
+  border-left-color: var(--accent-amber);
+}
+
+.activity-log-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.activity-log-item.paste .activity-log-icon {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-emerald);
+}
+
+.activity-log-item.unpaste .activity-log-icon {
+  background: rgba(255, 179, 2, 0.15);
+  color: var(--accent-amber);
+}
+
+.activity-log-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.activity-log-text {
+  font-size: 0.87rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.activity-log-text strong {
+  color: var(--text-primary);
+}
+
+.activity-verb-paste { color: var(--accent-emerald); font-weight: 700; }
+.activity-verb-unpaste { color: var(--accent-amber); font-weight: 700; }
+
+.activity-log-slot {
+  font-family: 'Space Mono', monospace;
+  color: var(--accent-cyan);
+}
+
+.activity-log-date {
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.activity-log-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.5rem 1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.activity-log-empty.error {
+  color: #FCA5A5;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius-md);
+}
+
+/* Issue #34: campana de notificaciones de actividad del álbum ------------- */
+.notifications-wrapper {
+  position: relative;
+}
+
+.notifications-bell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.notifications-bell:hover {
+  color: var(--accent-cyan);
+  border-color: rgba(0, 242, 254, 0.45);
+  background: rgba(0, 242, 254, 0.1);
+}
+
+.notifications-bell.has-unread {
+  color: var(--accent-amber);
+  border-color: rgba(255, 179, 2, 0.45);
+}
+
+.notifications-bell.open {
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+}
+
+.notifications-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #EF4444;
+  color: #FFF;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+  border: 1px solid var(--bg-main);
+}
+
+.notifications-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 320px;
+  max-width: calc(100vw - 2rem);
+  background: #111827;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
+  z-index: 120;
+  overflow: hidden;
+  animation: dropdownFade 0.16s ease-out;
+}
+
+.notifications-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.notifications-mark-all {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: none;
+  background: transparent;
+  color: var(--accent-cyan);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.2rem 0.35rem;
+  border-radius: var(--radius-sm);
+}
+
+.notifications-mark-all:hover {
+  background: rgba(0, 242, 254, 0.12);
+}
+
+.notifications-enable-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: calc(100% - 1.2rem);
+  margin: 0.6rem 0.6rem 0;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 179, 2, 0.12);
+  border: 1px solid rgba(255, 179, 2, 0.4);
+  color: var(--accent-amber);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.notifications-enable-btn:hover:not(:disabled) {
+  background: rgba(255, 179, 2, 0.22);
+}
+
+.notifications-enable-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.notifications-list {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 0.45rem;
+}
+
+.notification-item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.notification-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.notification-item.unread {
+  background: rgba(0, 242, 254, 0.07);
+}
+
+.notification-item.unread:hover {
+  background: rgba(0, 242, 254, 0.14);
+}
+
+.notification-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(0, 242, 254, 0.14);
+  color: var(--accent-cyan);
+}
+
+.notification-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.notification-message {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.notification-meta {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.notification-dot {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.6rem;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-amber);
+  box-shadow: 0 0 8px rgba(255, 179, 2, 0.8);
+}
+
+.notifications-empty {
+  padding: 1.25rem 0.75rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.notifications-footer-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.55rem;
+  border: none;
+  border-top: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.notifications-footer-link:hover {
+  background: rgba(0, 242, 254, 0.1);
+  color: var(--accent-cyan);
+}
+
+/* Preferencia de avisos de actividad (UserModal, Issue #34) */
+.notification-pref-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.7rem 0.4rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.notification-pref-toggle[data-enabled='true'] {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.5);
+  color: var(--accent-emerald);
+}
+
+.notification-pref-toggle:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.notification-pref-knob {
+  width: 30px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.55);
+  position: relative;
+  transition: background 0.2s ease;
+}
+
+.notification-pref-knob::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #FFF;
+  transition: transform 0.2s ease;
+}
+
+.notification-pref-toggle[data-enabled='true'] .notification-pref-knob {
+  background: var(--accent-emerald);
+}
+
+.notification-pref-toggle[data-enabled='true'] .notification-pref-knob::after {
+  transform: translateX(14px);
+}
+
+.notification-pref-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}

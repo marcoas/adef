@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   X, User, Mail, Globe, Users, Trash2, Copy, Check, 
-  Share2, Plus, AlertCircle, Loader2, LogOut, ShieldCheck, Link2
+  Share2, Plus, AlertCircle, Loader2, LogOut, ShieldCheck, Link2, Bell
 } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 
@@ -59,6 +59,9 @@ export const UserModal: React.FC<UserModalProps> = ({
   const [isCreating, setIsCreating] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  // Issue #34: preferencia de avisos de actividad del álbum
+  const [notifyAlbumActivity, setNotifyAlbumActivity] = useState(true);
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -71,9 +74,11 @@ export const UserModal: React.FC<UserModalProps> = ({
     if (!userSession) return;
     setIsLoading(true);
     try {
-      const [invitesRes, membersRes] = await Promise.all([
+      const [invitesRes, membersRes, prefsRes] = await Promise.all([
         fetch(`${apiUrl}/album/invites`, { headers: authHeaders() }),
         fetch(`${apiUrl}/album/members`, { headers: authHeaders() }),
+        // Issue #34: preferencia de avisos de actividad del álbum
+        fetch(`${apiUrl}/users/me/preferences`, { headers: authHeaders() }),
       ]);
 
       if (invitesRes.ok) {
@@ -83,6 +88,12 @@ export const UserModal: React.FC<UserModalProps> = ({
       if (membersRes.ok) {
         const memData = await membersRes.json();
         setMembers(memData.members || []);
+      }
+      if (prefsRes.ok) {
+        const prefsData = await prefsRes.json();
+        if (typeof prefsData.notifyOnAlbumActivity === 'boolean') {
+          setNotifyAlbumActivity(prefsData.notifyOnAlbumActivity);
+        }
       }
     } catch (err) {
       console.error('Error cargando datos del panel de usuario:', err);
@@ -97,6 +108,40 @@ export const UserModal: React.FC<UserModalProps> = ({
       loadData();
     }
   }, [isOpen, loadData]);
+
+  // Issue #34: activar/desactivar los avisos de actividad del álbum
+  const toggleNotifyAlbumActivity = async () => {
+    if (isSavingPrefs) return;
+    const nextValue = !notifyAlbumActivity;
+    const previousValue = notifyAlbumActivity;
+
+    setIsSavingPrefs(true);
+    setNotifyAlbumActivity(nextValue);
+    setActionMsg(null);
+
+    try {
+      const res = await fetch(`${apiUrl}/users/me/preferences`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ notifyOnAlbumActivity: nextValue }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'No se pudo guardar la preferencia.');
+
+      setActionMsg({
+        type: 'success',
+        text: nextValue ? t.notificationsOn : t.notificationsOff,
+      });
+    } catch (err) {
+      setNotifyAlbumActivity(previousValue);
+      setActionMsg({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Error al guardar la preferencia.',
+      });
+    } finally {
+      setIsSavingPrefs(false);
+    }
+  };
 
   const handleCreateInvite = async () => {
     setIsCreating(true);
@@ -264,6 +309,32 @@ export const UserModal: React.FC<UserModalProps> = ({
                 EN
               </button>
             </div>
+          </div>
+
+          {/* Issue #34: preferencia de avisos de actividad del álbum */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
+              <Bell size={16} style={{ color: 'var(--accent-amber)' }} />
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>{t.notificationSettings}</h3>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', lineHeight: 1.5 }}>
+              {t.notificationSettingsDesc}
+            </p>
+            <button
+              type="button"
+              className="notification-pref-toggle"
+              data-enabled={notifyAlbumActivity}
+              onClick={toggleNotifyAlbumActivity}
+              disabled={isSavingPrefs}
+              role="switch"
+              aria-checked={notifyAlbumActivity}
+            >
+              <span className="notification-pref-knob" />
+              <span className="notification-pref-label">
+                {isSavingPrefs ? <Loader2 size={13} className="spin" /> : null}
+                {notifyAlbumActivity ? t.notificationsOn : t.notificationsOff}
+              </span>
+            </button>
           </div>
 
           {/* Sección de Invitaciones y Asociados */}

@@ -125,6 +125,49 @@ async function resolveAccessibleAlbum(req: Request, res: Response): Promise<{ us
   return getOrCreateUserAlbum(userId);
 }
 
+// Issue #34: avisar al DUEÑO del álbum cuando un asociado pega una figurita
+// o se suma al álbum. Respeta la preferencia `notifyOnAlbumActivity` que se
+// configura desde el panel de usuario. Nunca genera avisos para uno mismo.
+async function notifyAlbumOwner(params: {
+  albumId: string;
+  actorId: string;
+  actorName: string;
+  type: 'STICKER_PASTED' | 'ASSOCIATE_JOINED';
+  slotNumber?: number;
+  rawPlate?: string;
+  message: string;
+}) {
+  try {
+    const album = await prisma.album.findUnique({
+      where: { id: params.albumId },
+      select: { ownerId: true },
+    });
+    if (!album || album.ownerId === params.actorId) return null;
+
+    const owner = await prisma.user.findUnique({
+      where: { id: album.ownerId },
+      select: { notifyOnAlbumActivity: true },
+    });
+    if (!owner || !owner.notifyOnAlbumActivity) return null;
+
+    return await prisma.notification.create({
+      data: {
+        userId: album.ownerId,
+        albumId: params.albumId,
+        actorUserId: params.actorId,
+        actorName: params.actorName,
+        type: params.type,
+        slotNumber: params.slotNumber ?? null,
+        rawPlate: params.rawPlate ?? null,
+        message: params.message,
+      },
+    });
+  } catch (error) {
+    console.error('Error al crear la notificación de actividad del álbum:', error);
+    return null;
+  }
+}
+
 // -------------------------------------------------------------
 // ENDPOINTS DE AUTENTICACIÓN
 // -------------------------------------------------------------
@@ -341,17 +384,40 @@ app.post('/api/album/stickers', requireAuth, async (req: Request, res: Response)
       }
     }
 
-    // Insertar figurita en PostgreSQL
-    const newSticker = await prisma.sticker.create({
-      data: {
-        albumId: album.id,
-        slotNumber: slot,
-        rawPlate: plateResult.formattedPlate,
-        imageUrl: storedImage?.imageUrl || imageUrl || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=500&auto=format&fit=crop&q=60',
-        thumbnailUrl: storedImage?.thumbnailUrl || null,
-        uploadedByUserId: user.id,
-      },
-      include: { uploadedBy: true },
+    // Insertar figurita en PostgreSQL (Issue #33: junto con el log del movimiento)
+    const [newSticker] = await prisma.$transaction([
+      prisma.sticker.create({
+        data: {
+          albumId: album.id,
+          slotNumber: slot,
+          rawPlate: plateResult.formattedPlate,
+          imageUrl: storedImage?.imageUrl || imageUrl || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=500&auto=format&fit=crop&q=60',
+          thumbnailUrl: storedImage?.thumbnailUrl || null,
+          uploadedByUserId: user.id,
+        },
+        include: { uploadedBy: true },
+      }),
+      prisma.stickerActivity.create({
+        data: {
+          albumId: album.id,
+          userId: user.id,
+          userName: user.name,
+          slotNumber: slot,
+          rawPlate: plateResult.formattedPlate,
+          action: 'PASTE',
+        },
+      }),
+    ]);
+
+    // Issue #34: si quien pegó la figurita no es el dueño del álbum, avisarle.
+    await notifyAlbumOwner({
+      albumId: album.id,
+      actorId: user.id,
+      actorName: user.name,
+      type: 'STICKER_PASTED',
+      slotNumber: slot,
+      rawPlate: newSticker.rawPlate,
+      message: `${user.name} pegó la figurita #${plateResult.formattedSlot} (${newSticker.rawPlate}) en el álbum "${album.title}".`,
     });
 
     return res.status(201).json({
@@ -383,7 +449,7 @@ app.delete('/api/album/stickers/:slotNumber', requireAuth, async (req: Request, 
     // el usuario es miembro invitado.
     const context = await resolveAccessibleAlbum(req, res);
     if (!context) return;
-    const { album } = context;
+    const { user, album } = context;
 
     const existingSticker = await prisma.sticker.findUnique({
       where: {
@@ -403,14 +469,27 @@ app.delete('/api/album/stickers/:slotNumber', requireAuth, async (req: Request, 
       return res.status(403).json({ error: 'Solo el dueño del álbum puede eliminar figuritas.' });
     }
 
-    await prisma.sticker.delete({
-      where: {
-        albumId_slotNumber: {
-          albumId: album.id,
-          slotNumber,
+    // Issue #33: registrar el despegue en el log y borrar la figurita
+    await prisma.$transaction([
+      prisma.sticker.delete({
+        where: {
+          albumId_slotNumber: {
+            albumId: album.id,
+            slotNumber,
+          },
         },
-      },
-    });
+      }),
+      prisma.stickerActivity.create({
+        data: {
+          albumId: album.id,
+          userId: user.id,
+          userName: user.name,
+          slotNumber,
+          rawPlate: existingSticker.rawPlate,
+          action: 'UNPASTE',
+        },
+      }),
+    ]);
 
     // Issue #11: limpiar también los archivos del disco
     deleteStoredImages(existingSticker.imageUrl, existingSticker.thumbnailUrl);
@@ -419,6 +498,56 @@ app.delete('/api/album/stickers/:slotNumber', requireAuth, async (req: Request, 
   } catch (error) {
     console.error('Error al eliminar figurita:', error);
     return res.status(500).json({ error: 'Error al eliminar figurita de PostgreSQL' });
+  }
+});
+
+// -------------------------------------------------------------
+// Issue #33: LOG HISTÓRICO DE MOVIMIENTOS DEL ÁLBUM
+// (quién y cuándo pegó o despegó cada figurita)
+// -------------------------------------------------------------
+app.get('/api/album/activity', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const context = await resolveAccessibleAlbum(req, res);
+    if (!context) return;
+    const { album } = context;
+
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '40'), 10) || 40, 1), 200);
+    const page = Math.max(parseInt(String(req.query.page ?? '1'), 10) || 1, 1);
+    const actionParam = String(req.query.action ?? '').toUpperCase();
+
+    const where: { albumId: string; action?: 'PASTE' | 'UNPASTE' } = { albumId: album.id };
+    if (actionParam === 'PASTE' || actionParam === 'UNPASTE') {
+      where.action = actionParam;
+    }
+
+    const [activities, total] = await Promise.all([
+      prisma.stickerActivity.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.stickerActivity.count({ where }),
+    ]);
+
+    return res.json({
+      album: { id: album.id, title: album.title },
+      total,
+      page,
+      limit,
+      hasMore: page * limit < total,
+      activities: activities.map((a) => ({
+        id: a.id,
+        action: a.action,
+        slotNumber: a.slotNumber,
+        rawPlate: a.rawPlate,
+        userName: a.userName,
+        createdAt: a.createdAt.toISOString(),
+      })),
+    });
+  } catch (error) {
+    console.error('Error al consultar el log de movimientos:', error);
+    return res.status(500).json({ error: 'Error al consultar el log de movimientos' });
   }
 });
 
@@ -458,6 +587,116 @@ app.get('/api/albums', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+
+// -------------------------------------------------------------
+// Issue #34: NOTIFICACIONES DE ACTIVIDAD DEL ÁLBUM
+// -------------------------------------------------------------
+app.get('/api/notifications', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as AuthedRequest).authUserId!;
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '20'), 10) || 20, 1), 100);
+    const unreadOnly = String(req.query.unreadOnly ?? '') === 'true';
+
+    const where = unreadOnly ? { userId, readAt: null } : { userId };
+
+    const [notifications, unreadCount] = await Promise.all([
+      prisma.notification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        include: { album: { select: { id: true, title: true } } },
+      }),
+      prisma.notification.count({ where: { userId, readAt: null } }),
+    ]);
+
+    return res.json({
+      unreadCount,
+      notifications: notifications.map((n) => ({
+        id: n.id,
+        type: n.type,
+        albumId: n.albumId,
+        albumTitle: n.album.title,
+        actorName: n.actorName,
+        slotNumber: n.slotNumber,
+        rawPlate: n.rawPlate,
+        message: n.message,
+        readAt: n.readAt ? n.readAt.toISOString() : null,
+        createdAt: n.createdAt.toISOString(),
+      })),
+    });
+  } catch (error) {
+    console.error('Error al obtener las notificaciones:', error);
+    return res.status(500).json({ error: 'Error al obtener las notificaciones' });
+  }
+});
+
+// Marcar notificaciones como leídas (todas o una lista de ids)
+app.post('/api/notifications/read', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as AuthedRequest).authUserId!;
+    const ids: string[] = Array.isArray(req.body?.ids)
+      ? req.body.ids.filter((id: unknown) => typeof id === 'string')
+      : [];
+
+    const where = ids.length > 0 ? { userId, id: { in: ids } } : { userId, readAt: null };
+
+    const result = await prisma.notification.updateMany({
+      where,
+      data: { readAt: new Date() },
+    });
+
+    return res.json({ updated: result.count });
+  } catch (error) {
+    console.error('Error al marcar las notificaciones como leídas:', error);
+    return res.status(500).json({ error: 'Error al actualizar las notificaciones' });
+  }
+});
+
+// -------------------------------------------------------------
+// Issue #34: PREFERENCIAS DEL USUARIO (recibir o no avisos)
+// -------------------------------------------------------------
+app.get('/api/users/me/preferences', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as AuthedRequest).authUserId!;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { notifyOnAlbumActivity: true },
+    });
+    if (!user) return res.status(401).json({ error: 'Usuario no encontrado.' });
+
+    return res.json({ notifyOnAlbumActivity: user.notifyOnAlbumActivity });
+  } catch (error) {
+    console.error('Error al obtener las preferencias del usuario:', error);
+    return res.status(500).json({ error: 'Error al obtener las preferencias' });
+  }
+});
+
+app.put('/api/users/me/preferences', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as AuthedRequest).authUserId!;
+    const { notifyOnAlbumActivity } = req.body ?? {};
+
+    if (typeof notifyOnAlbumActivity !== 'boolean') {
+      return res.status(400).json({ error: 'El campo "notifyOnAlbumActivity" debe ser true o false.' });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { notifyOnAlbumActivity },
+      select: { notifyOnAlbumActivity: true },
+    });
+
+    return res.json({
+      message: notifyOnAlbumActivity
+        ? 'Volverás a recibir avisos cuando un asociado pegue una figurita.'
+        : 'No volverás a recibir avisos de actividad del álbum.',
+      notifyOnAlbumActivity: user.notifyOnAlbumActivity,
+    });
+  } catch (error) {
+    console.error('Error al guardar las preferencias del usuario:', error);
+    return res.status(500).json({ error: 'Error al guardar las preferencias' });
+  }
+});
 
 // -------------------------------------------------------------
 // Issue #12: INVITACIONES DE ASOCIADOS (links únicos de un solo uso)
@@ -663,6 +902,15 @@ app.post('/api/invites/:token/accept', requireAuth, async (req: Request, res: Re
         data: { usedAt: new Date(), usedById: userId },
       }),
     ]);
+
+    // Issue #34: avisar al dueño del álbum que se sumó un asociado
+    await notifyAlbumOwner({
+      albumId: invite.albumId,
+      actorId: userId,
+      actorName: user.name,
+      type: 'ASSOCIATE_JOINED',
+      message: `${user.name} se unió como asociado a tu álbum "${invite.album.title}".`,
+    });
 
     return res.json({
       message: `Te uniste como invitado al álbum "${invite.album.title}".`,

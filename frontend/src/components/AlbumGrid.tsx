@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Sparkles, Lock, BookOpen, ArrowUp, ArrowLeftRight, CheckCircle2, CircleDashed, X } from 'lucide-react';
+import { Search, Sparkles, Lock, BookOpen, ArrowUp, ArrowLeftRight, CheckCircle2, CircleDashed, X, History } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 import { StickerData } from './StickerModal';
+import { QuickJumpBar } from './QuickJumpBar';
 
 export interface AlbumOption {
   id: string;
@@ -28,7 +29,12 @@ interface AlbumGridProps {
   activeAlbumId?: string | null;
   onChangeAlbum?: (albumId: string) => void;
   recentAddedSlot?: number | null;
+  // Issue #33: acceso al log histórico de movimientos del álbum
+  onOpenActivityLog?: () => void;
 }
+
+// Issue #32: casilleros ancla de la barra de links rápidos (0, 100, ... 900)
+const JUMP_GROUPS = Array.from({ length: 10 }, (_, i) => i * 100);
 
 export const AlbumGrid: React.FC<AlbumGridProps> = ({
   locale,
@@ -40,12 +46,15 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
   activeAlbumId = null,
   onChangeAlbum,
   recentAddedSlot,
+  onOpenActivityLog,
 }) => {
   const t = getTranslation(locale);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'collected' | 'missing'>('all');
   const [selectedAlbum, setSelectedAlbum] = useState<'own' | 'shared'>('own');
   const [showScrollTop, setShowScrollTop] = useState(false);
+  // Issue #32: centena activa según la posición del scroll
+  const [activeGroup, setActiveGroup] = useState<number | null>(null);
 
   // Issue #16: botón flotante al pie para scroll rápido hacia el inicio
   useEffect(() => {
@@ -110,6 +119,69 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
       setFilterType('collected');
     }
   };
+
+  // Issue #32: la barra de links rápidos sólo se muestra mientras el álbum se ve
+  // sin filtros (ni búsqueda): con filtros los casilleros ancla no están en pantalla.
+  const isFiltered = filterType !== 'all' || searchTerm.trim().length > 0;
+  const showQuickJump = !!userSession && !isFiltered;
+
+  // Offset vertical ocupado por el header y la barra de controles sticky
+  const getStickyOffset = () => {
+    const headerHeight = document.querySelector('.header-container')?.getBoundingClientRect().height || 0;
+    const controlsHeight = document.querySelector('.sticky-controls-bar')?.getBoundingClientRect().height || 0;
+    return headerHeight + controlsHeight + 12;
+  };
+
+  // Issue #32: desplaza el álbum hasta que las figuritas de esa centena queden visibles
+  const jumpToGroup = (group: number) => {
+    const target = document.getElementById(`slot-${group}`);
+    if (!target) return;
+
+    setActiveGroup(group);
+    const top = target.getBoundingClientRect().top + window.scrollY - getStickyOffset();
+    window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+  };
+
+  // Issue #32: resalta la centena que está a la vista del usuario
+  useEffect(() => {
+    if (!showQuickJump) {
+      setActiveGroup(null);
+      return;
+    }
+
+    let rafId = 0;
+
+    const updateActiveGroup = () => {
+      rafId = 0;
+      const threshold = getStickyOffset() + 8;
+
+      // Al llegar al final de la página el último grupo ancla no cruza el umbral
+      const reachedBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 4;
+      let current = JUMP_GROUPS[0];
+
+      for (const group of JUMP_GROUPS) {
+        const anchor = document.getElementById(`slot-${group}`);
+        if (!anchor) continue;
+        if (anchor.getBoundingClientRect().top <= threshold) current = group;
+      }
+
+      setActiveGroup(reachedBottom ? JUMP_GROUPS[JUMP_GROUPS.length - 1] : current);
+    };
+
+    const handleScroll = () => {
+      if (!rafId) rafId = window.requestAnimationFrame(updateActiveGroup);
+    };
+
+    updateActiveGroup();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleScroll);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
+  }, [showQuickJump, userSession]);
 
   return (
     <div>
@@ -255,9 +327,32 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Issue #33: acceso al log histórico de movimientos del álbum */}
+            {userSession && onOpenActivityLog && (
+              <button
+                type="button"
+                className="toolbar-icon-btn"
+                onClick={onOpenActivityLog}
+                title={t.activityLog}
+              >
+                <History size={15} />
+                <span className="toolbar-icon-btn-label">{t.activityLog}</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Issue #32: barra flotante de links rápidos (sólo sin filtros) */}
+      {showQuickJump && (
+        <QuickJumpBar
+          locale={locale}
+          groups={JUMP_GROUPS}
+          activeGroup={activeGroup}
+          onJump={jumpToGroup}
+        />
+      )}
 
       {/* Rejilla del Álbum 000-999 */}
       <div className="grid-container">
@@ -268,6 +363,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
           return (
             <div 
               key={slot}
+              id={`slot-${slot}`}
               className={`sticker-slot ${sticker ? 'collected' : ''} ${!userSession ? 'slot-disabled-no-session' : ''}`}
               onClick={() => {
                 if (!userSession) return;
