@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  X, User, Mail, Globe, Users, Trash2, Copy, Check,
+  X, Mail, Globe, Users, Trash2, Copy, Check,
   Share2, Plus, AlertCircle, Loader2, LogOut, ShieldCheck, Link2, Bell, Sun, Moon
 } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
@@ -299,8 +299,13 @@ export const UserModal: React.FC<UserModalProps> = ({
         {/* Header Modal — Issue #45: nombre de usuario y email dentro del header del título */}
         <div className="modal-header" style={{ marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <div style={{ background: 'rgba(0, 242, 254, 0.15)', padding: '6px', borderRadius: 'var(--radius-sm)', color: 'var(--accent-cyan)' }}>
-              <User size={20} />
+            {/* Issue #45: avatar real (foto o inicial) en la parte superior del panel */}
+            <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-cyan))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0B0F19', fontWeight: 800, fontSize: '1.15rem', overflow: 'hidden', flexShrink: 0 }}>
+              {userSession.avatarUrl ? (
+                <img src={userSession.avatarUrl} alt={userSession.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                userSession.name.charAt(0).toUpperCase()
+              )}
             </div>
             <div style={{ minWidth: 0 }}>
               <h2 className="modal-title">{t.userPanel}</h2>
@@ -342,80 +347,63 @@ export const UserModal: React.FC<UserModalProps> = ({
 
           {/* Issue #45: apartados pequeños separados (perfil, idioma, tema, avisos, invitaciones) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-            {/* Sección: Perfil */}
-            <div style={sectionCard}>
-              {sectionTitle(<User size={14} style={{ color: 'var(--accent-cyan)' }} />, t.panelProfile)}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-cyan))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0B0F19', fontWeight: 800, fontSize: '1.25rem', overflow: 'hidden', flexShrink: 0 }}>
-                  {userSession.avatarUrl ? (
-                    <img src={userSession.avatarUrl} alt={userSession.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    userSession.name.charAt(0).toUpperCase()
-                  )}
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>{userSession.name}</h3>
-                  <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <Mail size={13} /> {userSession.email}
-                  </p>
+            {/* Issue #45: Idioma + Tema en un solo renglón (dos columnas adyacentes, cada una con su propio panel) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.1rem', alignItems: 'stretch' }}>
+              {/* Columna: Idioma */}
+              <div style={sectionCard}>
+                {sectionTitle(<Globe size={14} style={{ color: 'var(--accent-cyan)' }} />, t.panelLanguage)}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className={`filter-pill ${locale === 'es' ? 'active' : ''}`}
+                    style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
+                    onClick={() => setLocale('es')}
+                  >
+                    ES
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-pill ${locale === 'en' ? 'active' : ''}`}
+                    style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
+                    onClick={() => setLocale('en')}
+                  >
+                    EN
+                  </button>
                 </div>
               </div>
-            </div>
 
-            {/* Sección: Idioma (Issue #45: apartado propio, separado del resto) */}
-            <div style={sectionCard}>
-              {sectionTitle(<Globe size={14} style={{ color: 'var(--accent-cyan)' }} />, t.panelLanguage)}
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
-                  type="button"
-                  className={`filter-pill ${locale === 'es' ? 'active' : ''}`}
-                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
-                  onClick={() => setLocale('es')}
-                >
-                  ES
-                </button>
-                <button
-                  type="button"
-                  className={`filter-pill ${locale === 'en' ? 'active' : ''}`}
-                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
-                  onClick={() => setLocale('en')}
-                >
-                  EN
-                </button>
-              </div>
-            </div>
-
-            {/* Sección: Tema claro/oscuro (Issue #45: apartado propio, separado del idioma) */}
-            <div style={sectionCard}>
-              {sectionTitle(
-                theme === 'dark'
-                  ? <Moon size={14} style={{ color: 'var(--accent-amber)' }} />
-                  : <Sun size={14} style={{ color: 'var(--accent-amber)' }} />,
-                t.panelTheme,
-              )}
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
-                  type="button"
-                  className={`filter-pill ${theme === 'light' ? 'active' : ''}`}
-                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                  onClick={() => applyThemeOption('light')}
-                  title={t.themeLight}
-                  aria-label={t.themeLight}
-                >
-                  <Sun size={14} />
-                  <span>{t.themeLightShort}</span>
-                </button>
-                <button
-                  type="button"
-                  className={`filter-pill ${theme === 'dark' ? 'active' : ''}`}
-                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                  onClick={() => applyThemeOption('dark')}
-                  title={t.themeDark}
-                  aria-label={t.themeDark}
-                >
-                  <Moon size={14} />
-                  <span>{t.themeDarkShort}</span>
-                </button>
+              {/* Columna: Tema */}
+              <div style={sectionCard}>
+                {sectionTitle(
+                  theme === 'dark'
+                    ? <Moon size={14} style={{ color: 'var(--accent-amber)' }} />
+                    : <Sun size={14} style={{ color: 'var(--accent-amber)' }} />,
+                  t.panelTheme,
+                )}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className={`filter-pill ${theme === 'light' ? 'active' : ''}`}
+                    style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                    onClick={() => applyThemeOption('light')}
+                    title={t.themeLight}
+                    aria-label={t.themeLight}
+                  >
+                    <Sun size={14} />
+                    <span>{t.themeLightShort}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-pill ${theme === 'dark' ? 'active' : ''}`}
+                    style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                    onClick={() => applyThemeOption('dark')}
+                    title={t.themeDark}
+                    aria-label={t.themeDark}
+                  >
+                    <Moon size={14} />
+                    <span>{t.themeDarkShort}</span>
+                  </button>
+                </div>
               </div>
             </div>
 
