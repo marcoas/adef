@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { X, Upload, Sparkles, CheckCircle, AlertCircle, Loader2, RotateCw, RotateCcw, RefreshCw, Crop, Target } from 'lucide-react';
+import { X, Upload, CheckCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 
 interface UploadModalProps {
@@ -25,13 +25,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const t = getTranslation(locale);
   const [plateInput, setPlateInput] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [croppedPreview, setCroppedPreview] = useState<string | null>(null);
-  const [rotation, setRotation] = useState(0);
   const [isProcessingOCR, setIsProcessingOCR] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Centro del recuadro de recorte (porcentaje X, Y de la imagen)
-  const [cropCenter, setCropCenter] = useState({ x: 50, y: 55, width: 45, height: 25 });
   const imageRef = useRef<HTMLImageElement | null>(null);
 
   // Issue #10: solo se aceptan imágenes JPG o PNG y de hasta 5 MB
@@ -42,9 +38,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
   const handleClose = () => {
     setImagePreview(null);
-    setCroppedPreview(null);
     setPlateInput('');
-    setRotation(0);
     setErrorMsg(null);
     setIsProcessingOCR(false);
     onClose();
@@ -52,98 +46,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
   const handleResetPhoto = () => {
     setImagePreview(null);
-    setCroppedPreview(null);
     setPlateInput('');
-    setRotation(0);
     setErrorMsg(null);
-  };
-
-  /**
-   * Recorta la región seleccionada (ROI) sobre la chapa patente
-   */
-  const processCropAndOCR = (imageSrc: string, angleDegrees: number, center: typeof cropCenter): Promise<string> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return resolve(imageSrc);
-
-        const rad = (angleDegrees * Math.PI) / 180;
-        const sin = Math.abs(Math.sin(rad));
-        const cos = Math.abs(Math.cos(rad));
-        const rotWidth = img.width * cos + img.height * sin;
-        const rotHeight = img.width * sin + img.height * cos;
-
-        const fullCanvas = document.createElement('canvas');
-        fullCanvas.width = rotWidth;
-        fullCanvas.height = rotHeight;
-        const fullCtx = fullCanvas.getContext('2d')!;
-
-        fullCtx.translate(rotWidth / 2, rotHeight / 2);
-        fullCtx.rotate(rad);
-        fullCtx.drawImage(img, -img.width / 2, -img.height / 2);
-
-        // Calcular caja delimitadora
-        const boxW = (center.width / 100) * rotWidth;
-        const boxH = (center.height / 100) * rotHeight;
-        const boxX = (center.x / 100) * rotWidth - boxW / 2;
-        const boxY = (center.y / 100) * rotHeight - boxH / 2;
-
-        const cropX = Math.max(0, boxX);
-        const cropY = Math.max(0, boxY);
-        const cropW = Math.min(rotWidth - cropX, boxW);
-        const cropH = Math.min(rotHeight - cropY, boxH);
-
-        canvas.width = Math.max(120, cropW);
-        canvas.height = Math.max(50, cropH);
-
-        ctx.drawImage(fullCanvas, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
-
-        // Aumento de Contraste Binarizado
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imgData.data;
-        const contrast = 1.8;
-        const factor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
-
-        for (let i = 0; i < data.length; i += 4) {
-          const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-          const cAvg = factor * (avg - 128) + 128;
-          data[i] = cAvg;
-          data[i + 1] = cAvg;
-          data[i + 2] = cAvg;
-        }
-        ctx.putImageData(imgData, 0, 0);
-
-        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
-        setCroppedPreview(croppedDataUrl);
-        resolve(croppedDataUrl);
-      };
-      img.onerror = () => resolve(imageSrc);
-      img.src = imageSrc;
-    });
-  };
-
-  /**
-   * Al hacer clic directamente en la foto sobre la patente:
-   * Centra el recuadro sobre el punto del clic y dispara el escaneo OCR.
-   */
-  const handleImageClick = async (e: React.MouseEvent<HTMLImageElement>) => {
-    if (!imageRef.current || !imagePreview) return;
-
-    const rect = imageRef.current.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-
-    const pctX = Math.round((clickX / rect.width) * 100);
-    const pctY = Math.round((clickY / rect.height) * 100);
-
-    const newCenter = { ...cropCenter, x: pctX, y: pctY };
-    setCropCenter(newCenter);
-
-    const croppedData = await processCropAndOCR(imagePreview, rotation, newCenter);
-    runRealOCR(croppedData);
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -169,25 +73,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     reader.onload = async () => {
       const base64Data = reader.result as string;
       setImagePreview(base64Data);
-      setRotation(0);
 
-      const defaultCenter = { x: 50, y: 55, width: 45, height: 25 };
-      setCropCenter(defaultCenter);
-      
       // Enviar la imagen original completa al motor ALPR/Plate Recognizer para detección automática instantánea
       runRealOCR(base64Data);
     };
     reader.readAsDataURL(file);
-  };
-
-  const handleRotate = async (deltaAngle: number) => {
-    const newAngle = (rotation + deltaAngle) % 360;
-    setRotation(newAngle);
-
-    if (imagePreview) {
-      const croppedData = await processCropAndOCR(imagePreview, newAngle, cropCenter);
-      runRealOCR(croppedData);
-    }
   };
 
   const runRealOCR = async (imageBase64: string) => {
@@ -297,9 +187,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-              <label style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Target size={16} style={{ color: 'var(--accent-cyan)' }} />
-                <span>Haz clic sobre la patente en la foto</span>
+              <label style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                <span>Foto de la patente</span>
               </label>
 
               {imagePreview && (
@@ -335,89 +224,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             >
               {imagePreview ? (
                 <div>
-                  {/* Visor interactivo con recuadro delimitador */}
-                  <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '8px', maxHeight: '240px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'crosshair' }}>
+                  {/* Visor simple de la foto capturada (Issue #49: sin recuadro ni rotación) */}
+                  <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '8px', maxHeight: '240px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                     <img 
                       ref={imageRef}
                       src={imagePreview} 
                       alt="Patente capturada" 
-                      onClick={handleImageClick}
                       style={{ 
                         maxHeight: '240px', 
                         maxWidth: '100%',
-                        transform: `rotate(${rotation}deg)`,
-                        transition: 'transform 0.3s ease',
                         objectFit: 'contain' 
                       }} 
                     />
-
-                    {/* Recuadro visual del área enfocada */}
-                    <div 
-                      style={{
-                        position: 'absolute',
-                        left: `${cropCenter.x - cropCenter.width / 2}%`,
-                        top: `${cropCenter.y - cropCenter.height / 2}%`,
-                        width: `${cropCenter.width}%`,
-                        height: `${cropCenter.height}%`,
-                        border: '2px solid var(--accent-cyan)',
-                        boxShadow: '0 0 12px rgba(0, 242, 254, 0.6), inset 0 0 12px rgba(0, 242, 254, 0.2)',
-                        borderRadius: '4px',
-                        pointerEvents: 'none',
-                        transition: 'all 0.2s ease',
-                      }}
-                    >
-                      <div style={{
-                        position: 'absolute',
-                        top: '-20px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        background: 'var(--accent-cyan)',
-                        color: '#000',
-                        fontSize: '0.65rem',
-                        fontWeight: 'bold',
-                        padding: '1px 6px',
-                        borderRadius: '4px',
-                        whiteSpace: 'nowrap',
-                      }}>
-                        ÁREA OCR
-                      </div>
-                    </div>
-                  </div>
-
-                  <p style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', marginTop: '0.4rem' }}>
-                    💡 Tip: Haz clic exactamente sobre la chapa patente en la foto para mover la mira.
-                  </p>
-
-                  {/* Recorte enfocado y botones de rotación */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.75rem', gap: '0.5rem', background: 'rgba(0,0,0,0.4)', padding: '0.5rem', borderRadius: '8px' }}>
-                    {croppedPreview && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Recorte:</span>
-                        <img src={croppedPreview} alt="Recorte Chapa" style={{ height: '32px', borderRadius: '4px', border: '1px solid var(--accent-cyan)' }} />
-                      </div>
-                    )}
-
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button 
-                        type="button" 
-                        className="btn-secondary" 
-                        onClick={() => handleRotate(-15)}
-                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
-                      >
-                        <RotateCcw size={14} />
-                        <span>-15°</span>
-                      </button>
-
-                      <button 
-                        type="button" 
-                        className="btn-secondary" 
-                        onClick={() => handleRotate(15)}
-                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
-                      >
-                        <RotateCw size={14} />
-                        <span>+15°</span>
-                      </button>
-                    </div>
                   </div>
 
                   {isProcessingOCR && (
