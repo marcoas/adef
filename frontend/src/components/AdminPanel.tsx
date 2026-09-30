@@ -11,7 +11,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   X, ShieldCheck, LayoutDashboard, Users, Search, AlertCircle, Loader2,
   Ban, CheckCircle2, Trash2, Eye, ChevronLeft, User as UserIcon, Mail,
-  Activity, KeyRound, UserX, BookOpen, Image as ImageIcon,
+  Activity, KeyRound, UserX, BookOpen, Image as ImageIcon, Gauge,
 } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 
@@ -63,6 +63,19 @@ interface ApiUsageEntry {
   byDay: Record<string, number>;
 }
 
+// Issue #48: consumo mensual de una API externa (Plate Recognizer) para el
+// panel de administración: total, exitosas, fallidas, cuota, restante y %.
+interface ExternalApiUsage {
+  provider: string;
+  monthLabel: string;
+  total: number;
+  ok: number;
+  failed: number;
+  quota: number;
+  remaining: number;
+  percentUsed: number;
+}
+
 interface RecentActivity {
   id: string;
   userName: string;
@@ -76,6 +89,7 @@ interface DashboardData {
   totals: { users: number; albums: number; stickers: number; restrictedUsers: number; adminUsers: number };
   last14Days: { day: string; users: number; stickers: number }[];
   apiUsage: ApiUsageEntry[];
+  externalApiUsage?: ExternalApiUsage;
   recentActivity: RecentActivity[];
   generatedAt: string;
 }
@@ -271,6 +285,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, locale,
       {label}
     </span>
   );
+  // Issue #48: casilla métrica pequeña para la tarjeta de consumo de APIs externas.
+  const metricBox = (label: string, value: number, color: string) => (
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '0.5rem 0.6rem' }}>
+      <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+      <div style={{ fontSize: '1.15rem', fontWeight: 800, color, marginTop: '0.15rem' }}>{value}</div>
+    </div>
+  );
   const smallBtn: React.CSSProperties = {
     padding: '0.35rem 0.65rem',
     fontSize: '0.75rem',
@@ -337,6 +358,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, locale,
                       <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.25rem' }}>{item.value}</div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Issue #48: consumo de APIs externas (mes, usos, restantes, %) */}
+              {dashboard?.externalApiUsage && (
+                <div style={card}>
+                  {cardTitle(<Gauge size={14} style={{ color: 'var(--accent-cyan)' }} />, t.adminExternalApiTitle)}
+                  {(() => {
+                    const u = dashboard.externalApiUsage!;
+                    const pct = Math.min(100, u.percentUsed);
+                    const barColor = pct >= 100 ? '#EF4444' : pct >= 80 ? '#F59E0B' : 'var(--accent-cyan)';
+                    return (
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.55rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                            <strong style={{ color: 'var(--text-primary)' }}>{u.provider}</strong>
+                            <span> · {t.adminExternalApiMonth}: <strong style={{ color: 'var(--text-primary)' }}>{u.monthLabel}</strong></span>
+                          </span>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 800, color: barColor }}>{u.percentUsed}% {t.adminExternalApiPct}</span>
+                        </div>
+                        <div style={{ height: '12px', borderRadius: '999px', background: 'rgba(148, 163, 184, 0.18)', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: '999px', transition: 'width 0.4s ease', minWidth: u.total > 0 ? '6px' : 0 }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
+                          <span>{u.total} / {u.quota} {t.adminExternalApiUsed.toLowerCase()}</span>
+                          <span>{t.adminExternalApiRemaining}: <strong style={{ color: 'var(--accent-amber)' }}>{u.remaining}</strong></span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(95px, 1fr))', gap: '0.5rem', marginTop: '0.75rem' }}>
+                          {metricBox(t.adminExternalApiUsed, u.total, 'var(--text-primary)')}
+                          {metricBox(t.adminExternalApiOk, u.ok, '#22C55E')}
+                          {metricBox(t.adminExternalApiFailed, u.failed, '#EF4444')}
+                          {metricBox(t.adminExternalApiQuota, u.quota, 'var(--text-secondary)')}
+                          {metricBox(t.adminExternalApiRemaining, u.remaining, 'var(--accent-amber)')}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 

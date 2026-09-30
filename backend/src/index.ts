@@ -47,6 +47,22 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
 
+// Issue #48: cuota mensual configurable de llamadas a la API externa
+// (Plate Recognizer). Por defecto 1000 llamadas/mes; se lee desde env para
+// poder ajustarla sin tocar código.
+const PLATE_RECOGNIZER_MONTHLY_QUOTA = parseInt(process.env.PLATE_RECOGNIZER_MONTHLY_QUOTA || '1000', 10);
+
+// Issue #48: registra una llamada a una API externa (éxito o fallo) para el
+// panel de administración. Es "fuego y olvido": si el registro falla solo se
+// loguea y no afecta la respuesta (la patente igual se procesa normalmente).
+async function recordExternalApiCall(ok: boolean, provider = 'plate_recognizer'): Promise<void> {
+  try {
+    await prisma.externalApiCall.create({ data: { provider, ok } });
+  } catch (err) {
+    console.error('No se pudo registrar el consumo de la API externa:', err);
+  }
+}
+
 // Middleware: exige un JWT válido (Authorization: Bearer <token>) para
 // interactuar con el álbum (cargar / eliminar fotos) - Issue #6
 // Issue #41: además valida que la cuenta exista y no esté RESTRICTED.
@@ -358,7 +374,11 @@ app.post('/api/plates/ocr', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Se requiere la imagen en base64 para el OCR' });
     }
 
-    const alprResult = await recognizePlateALPR(imageBase64);
+    // Issue #48: se registra cada llamada real a Plate Recognizer (éxito o
+    // fallo) en la BD para el consumo del mes en el panel de administración.
+    const alprResult = await recognizePlateALPR(imageBase64, {
+      recordExternalCall: (ok) => recordExternalApiCall(ok),
+    });
     return res.json(alprResult);
   } catch (error) {
     console.error('Error en procesamiento OCR / ALPR:', error);
@@ -1273,10 +1293,29 @@ app.get('/api/admin/dashboard', requireAuth, requireAdmin, async (req: Request, 
       include: { album: { select: { title: true } } },
     });
 
+    // Issue #48: consumo de la API externa (Plate Recognizer) en el mes actual:
+    // total de llamadas, exitosas, fallidas, cuota mensual, restante y %.
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const [extTotal, extOk] = await Promise.all([
+      prisma.externalApiCall.count({ where: { createdAt: { gte: monthStart } } }),
+      prisma.externalApiCall.count({ where: { createdAt: { gte: monthStart }, ok: true } }),
+    ]);
+    const externalApiUsage = {
+      provider: 'Plate Recognizer',
+      monthLabel: now.toLocaleString('es-AR', { month: 'long', year: 'numeric' }),
+      total: extTotal,
+      ok: extOk,
+      failed: extTotal - extOk,
+      quota: PLATE_RECOGNIZER_MONTHLY_QUOTA,
+      remaining: Math.max(0, PLATE_RECOGNIZER_MONTHLY_QUOTA - extTotal),
+      percentUsed: PLATE_RECOGNIZER_MONTHLY_QUOTA > 0 ? Math.round((extTotal / PLATE_RECOGNIZER_MONTHLY_QUOTA) * 100) : 0,
+    };
+
     return res.json({
       totals: { users: totalUsers, albums: totalAlbums, stickers: totalStickers, restrictedUsers, adminUsers },
       last14Days,
       apiUsage: apiUsageSummary,
+      externalApiUsage,
       recentActivity,
       generatedAt: new Date().toISOString(),
     });

@@ -178,3 +178,17 @@ model Notification {
   @@index([albumId])
   @@map("notifications")
 }
+
+// Issue #48: registro de cada llamada a una API externa (Plate Recognizer).
+// Almacena el consumo real para el panel de administración: total del mes,
+// cuota mensual, restante y porcentaje. Se guarda `ok` para distinguir
+// llamadas exitosas de fallidas (ambas consumen cuota del proveedor).
+model ExternalApiCall {
+  id        String   @id @default(uuid())
+  provider  String   @default("plate_recognizer")
+  ok        Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([provider, createdAt])
+  @@map("external_api_calls")
+}

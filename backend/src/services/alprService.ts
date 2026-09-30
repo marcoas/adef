@@ -7,7 +7,24 @@ import { extractPlate, PlateResult } from '../utils/plateExtractor';
  * 1. Intenta consulta a Plate Recognizer API (IA especializada en patentes).
  * 2. Si no hay Token o falla la conexión, realiza fallback automático a Tesseract OCR Local.
  */
-export async function recognizePlateALPR(imageBase64: string): Promise<{ ocrText: string; plateResult: PlateResult; provider: string }> {
+// Issue #48: callback opcional para registrar cada llamada real a una API
+// externa (Plate Recognizer). Vive en index.ts (donde está el PrismaClient)
+// y evita dependencia circular con la base de datos.
+export interface ALPRDeps {
+  recordExternalCall?: (ok: boolean) => void | Promise<void>;
+}
+
+export async function recognizePlateALPR(
+  imageBase64: string,
+  deps: ALPRDeps = {},
+): Promise<{ ocrText: string; plateResult: PlateResult; provider: string }> {
+  const record = deps.recordExternalCall;
+  let externalCounted = false;
+  const markExternal = (ok: boolean) => {
+    if (externalCounted) return;
+    externalCounted = true;
+    record?.(ok);
+  };
   const PLATE_RECOGNIZER_TOKEN = process.env.PLATE_RECOGNIZER_TOKEN;
 
   // Estrategia 1: Plate Recognizer Cloud Service (100% Gratuito y especializado en patentes)
@@ -32,6 +49,8 @@ export async function recognizePlateALPR(imageBase64: string): Promise<{ ocrText
       });
 
       if (response.ok) {
+        // Issue #48: el servicio respondió correctamente => consumió 1 llamada.
+        markExternal(true);
         const data: any = await response.json();
         console.log('🌐 Respuesta exitosa de Plate Recognizer API:', JSON.stringify(data.results));
 
@@ -49,10 +68,14 @@ export async function recognizePlateALPR(imageBase64: string): Promise<{ ocrText
           console.warn('⚠️ Plate Recognizer no encontró placas en la foto enviada.');
         }
       } else {
+        // Issue #48: el servicio respondió con error => consumo fallido.
+        markExternal(false);
         const errText = await response.text();
         console.error(`❌ Error en respuesta de Plate Recognizer (${response.status}):`, errText);
       }
     } catch (error) {
+      // Issue #48: excepción durante la llamada (red/timeout) => consumo fallido.
+      markExternal(false);
       console.error('⚠️ Excepción al conectar con Plate Recognizer:', error);
     }
   } else {

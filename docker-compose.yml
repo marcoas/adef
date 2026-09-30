@@ -39,6 +39,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-super_secret_jwt_key_patentes_2026_change_me}
       FRONTEND_URL: http://localhost:3000
       PLATE_RECOGNIZER_TOKEN: ${PLATE_RECOGNIZER_TOKEN}
+      # Issue #48: cuota mensual de llamadas a Plate Recognizer (panel de admin)
+      PLATE_RECOGNIZER_MONTHLY_QUOTA: ${PLATE_RECOGNIZER_MONTHLY_QUOTA:-1000}
       MAX_IMAGE_SIZE_MB: ${MAX_IMAGE_SIZE_MB:-5}
       # Issue #41: correos (separados por coma) marcados como administradores
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
