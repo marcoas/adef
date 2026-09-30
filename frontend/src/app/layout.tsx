@@ -5,6 +5,12 @@ export const metadata: Metadata = {
   title: 'Álbum de Patentes | Colección de Patentes 000-999',
   description: 'Webapp lúdica y familiar para coleccionar y registrar fotografías de patentes de automóviles en un álbum digital de 1000 casilleros.',
   keywords: ['patentes', 'album', 'figuritas', 'mercosur', 'autitos', 'coleccion'],
+  // Issue #47: favicon con forma de chapa patente argentina
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({

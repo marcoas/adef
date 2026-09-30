@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Chapa patente argentina">
+  <!-- Fondo -->
+  <rect width="100" height="100" rx="14" fill="#0B0F19"/>
+  <!-- Chapa patente (formato Mercosur: fondo blanco, borde negro) -->
+  <rect x="7" y="24" width="86" height="52" rx="6" fill="#FFFFFF" stroke="#0B0F19" stroke-width="3.5"/>
+  <!-- Banda superior azul con "ARGENTINA" -->
+  <rect x="11" y="28" width="78" height="12" rx="2.5" fill="#0B0F19" opacity="0.06"/>
+  <text x="50" y="37.5" font-family="Arial, Helvetica, sans-serif" font-size="9.5" font-weight="800" fill="#0038A8" text-anchor="middle" letter-spacing="1.2">ARGENTINA</text>
+  <!-- Código de patente (3 dígitos + 3 letras) -->
+  <text x="50" y="66" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="800" fill="#0B0F19" text-anchor="middle" letter-spacing="1">123ABC</text>
+  <!-- Tornillos decorativos -->
+  <circle cx="15" cy="68" r="1.8" fill="#9AA0A6"/>
+  <circle cx="85" cy="68" r="1.8" fill="#9AA0A6"/>
+</svg>
