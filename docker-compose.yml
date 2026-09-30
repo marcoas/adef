@@ -40,6 +40,8 @@ services:
       FRONTEND_URL: http://localhost:3000
       PLATE_RECOGNIZER_TOKEN: ${PLATE_RECOGNIZER_TOKEN}
       MAX_IMAGE_SIZE_MB: ${MAX_IMAGE_SIZE_MB:-5}
+      # Issue #41: correos (separados por coma) marcados como administradores
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       # Proveedor de imágenes: "local" (disco del backend) o "cloudinary".
       # Con "cloudinary" se requieren las 3 credenciales de abajo.
       IMAGE_PROVIDER: ${IMAGE_PROVIDER:-local}

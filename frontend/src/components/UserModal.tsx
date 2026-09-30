@@ -13,6 +13,9 @@ interface UserSession {
   email: string;
   name: string;
   avatarUrl?: string;
+  // Issue #41: datos de cuenta para el panel de administración
+  id?: string;
+  isAdmin?: boolean;
 }
 
 interface Invite {
@@ -44,6 +47,8 @@ interface UserModalProps {
   userSession: UserSession | null;
   onLogout: () => void;
   onOpenInviteModal?: () => void;
+  // Issue #41: abrir el panel privado de administración (solo se muestra para admins)
+  onOpenAdminPanel?: () => void;
 }
 
 export const UserModal: React.FC<UserModalProps> = ({
@@ -53,6 +58,7 @@ export const UserModal: React.FC<UserModalProps> = ({
   setLocale,
   userSession,
   onLogout,
+  onOpenAdminPanel,
 }) => {
   const t = getTranslation(locale);
   const [invites, setInvites] = useState<Invite[]>([]);
@@ -76,12 +82,38 @@ export const UserModal: React.FC<UserModalProps> = ({
   }
   const [inviteLog, setInviteLog] = useState<InviteLogEntry[]>([]);
   // Issue #43: control de tema claro/oscuro dentro del panel de usuario
+  // Issue #45: selector con dos opciones explícitas (Claro / Oscuro) en su propia sección
   const [theme, setTheme] = useState<Theme>('dark');
-  const toggleTheme = () => {
-    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+  const applyThemeOption = (next: Theme) => {
     setTheme(next);
     applyTheme(next);
   };
+
+  // Issue #45: tarjetas pequeñas y separadas para cada apartado del panel
+  const sectionCard: React.CSSProperties = {
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-md)',
+    padding: '0.9rem 1rem',
+  };
+  const sectionTitle = (icon: React.ReactNode, label: string) => (
+    <div
+      style={{
+        fontSize: '0.78rem',
+        fontWeight: 700,
+        color: 'var(--text-secondary)',
+        marginBottom: '0.65rem',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+      }}
+    >
+      {icon}
+      {label}
+    </div>
+  );
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -264,13 +296,22 @@ export const UserModal: React.FC<UserModalProps> = ({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card user-panel-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-        {/* Header Modal */}
+        {/* Header Modal — Issue #45: nombre de usuario y email dentro del header del título */}
         <div className="modal-header" style={{ marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <div style={{ background: 'rgba(0, 242, 254, 0.15)', padding: '6px', borderRadius: 'var(--radius-sm)', color: 'var(--accent-cyan)' }}>
               <User size={20} />
             </div>
-            <h2 className="modal-title">{t.userPanel}</h2>
+            <div style={{ minWidth: 0 }}>
+              <h2 className="modal-title">{t.userPanel}</h2>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {userSession.name}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <Mail size={11} style={{ flexShrink: 0 }} />
+                {userSession.email}
+              </div>
+            </div>
           </div>
           <button className="close-btn" onClick={onClose} aria-label="Cerrar">
             <X size={20} />
@@ -299,86 +340,110 @@ export const UserModal: React.FC<UserModalProps> = ({
             </div>
           )}
 
-          {/* Tarjeta de Perfil */}
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-cyan))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0B0F19', fontWeight: 800, fontSize: '1.25rem', overflow: 'hidden' }}>
-                {userSession.avatarUrl ? (
-                  <img src={userSession.avatarUrl} alt={userSession.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  userSession.name.charAt(0).toUpperCase()
-                )}
+          {/* Issue #45: apartados pequeños separados (perfil, idioma, tema, avisos, invitaciones) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+            {/* Sección: Perfil */}
+            <div style={sectionCard}>
+              {sectionTitle(<User size={14} style={{ color: 'var(--accent-cyan)' }} />, t.panelProfile)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-cyan))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0B0F19', fontWeight: 800, fontSize: '1.25rem', overflow: 'hidden', flexShrink: 0 }}>
+                  {userSession.avatarUrl ? (
+                    <img src={userSession.avatarUrl} alt={userSession.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    userSession.name.charAt(0).toUpperCase()
+                  )}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>{userSession.name}</h3>
+                  <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Mail size={13} /> {userSession.email}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>{userSession.name}</h3>
-                <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <Mail size={13} /> {userSession.email}
-                </p>
+            </div>
+
+            {/* Sección: Idioma (Issue #45: apartado propio, separado del resto) */}
+            <div style={sectionCard}>
+              {sectionTitle(<Globe size={14} style={{ color: 'var(--accent-cyan)' }} />, t.panelLanguage)}
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  className={`filter-pill ${locale === 'es' ? 'active' : ''}`}
+                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
+                  onClick={() => setLocale('es')}
+                >
+                  ES
+                </button>
+                <button
+                  type="button"
+                  className={`filter-pill ${locale === 'en' ? 'active' : ''}`}
+                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
+                  onClick={() => setLocale('en')}
+                >
+                  EN
+                </button>
               </div>
             </div>
 
-            {/* Selector de idioma */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Globe size={16} style={{ color: 'var(--accent-cyan)' }} />
+            {/* Sección: Tema claro/oscuro (Issue #45: apartado propio, separado del idioma) */}
+            <div style={sectionCard}>
+              {sectionTitle(
+                theme === 'dark'
+                  ? <Moon size={14} style={{ color: 'var(--accent-amber)' }} />
+                  : <Sun size={14} style={{ color: 'var(--accent-amber)' }} />,
+                t.panelTheme,
+              )}
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  className={`filter-pill ${theme === 'light' ? 'active' : ''}`}
+                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  onClick={() => applyThemeOption('light')}
+                  title={t.themeLight}
+                  aria-label={t.themeLight}
+                >
+                  <Sun size={14} />
+                  <span>{t.themeLightShort}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`filter-pill ${theme === 'dark' ? 'active' : ''}`}
+                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  onClick={() => applyThemeOption('dark')}
+                  title={t.themeDark}
+                  aria-label={t.themeDark}
+                >
+                  <Moon size={14} />
+                  <span>{t.themeDarkShort}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Sección: Avisos de actividad del álbum (Issue #34 / #45: apartado propio) */}
+            <div style={sectionCard}>
+              {sectionTitle(<Bell size={14} style={{ color: 'var(--accent-amber)' }} />, t.notificationSettings)}
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', lineHeight: 1.5 }}>
+                {t.notificationSettingsDesc}
+              </p>
               <button
                 type="button"
-                className={`filter-pill ${locale === 'es' ? 'active' : ''}`}
-                style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
-                onClick={() => setLocale('es')}
+                className="notification-pref-toggle"
+                data-enabled={notifyAlbumActivity}
+                onClick={toggleNotifyAlbumActivity}
+                disabled={isSavingPrefs}
+                role="switch"
+                aria-checked={notifyAlbumActivity}
               >
-                ES
-              </button>
-              <button
-                type="button"
-                className={`filter-pill ${locale === 'en' ? 'active' : ''}`}
-                style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
-                onClick={() => setLocale('en')}
-              >
-                EN
-              </button>
-              {/* Issue #43: única opción para cambiar entre tema claro y oscuro */}
-              <button
-                type="button"
-                className="filter-pill"
-                style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                onClick={toggleTheme}
-                title={theme === 'dark' ? t.themeLight : t.themeDark}
-                aria-label={theme === 'dark' ? t.themeLight : t.themeDark}
-              >
-                {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-                <span>{theme === 'dark' ? t.themeDarkShort : t.themeLightShort}</span>
+                <span className="notification-pref-knob" />
+                <span className="notification-pref-label">
+                  {isSavingPrefs ? <Loader2 size={13} className="spin" /> : null}
+                  {notifyAlbumActivity ? t.notificationsOn : t.notificationsOff}
+                </span>
               </button>
             </div>
-          </div>
 
-          {/* Issue #34: preferencia de avisos de actividad del álbum */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
-              <Bell size={16} style={{ color: 'var(--accent-amber)' }} />
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>{t.notificationSettings}</h3>
-            </div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', lineHeight: 1.5 }}>
-              {t.notificationSettingsDesc}
-            </p>
-            <button
-              type="button"
-              className="notification-pref-toggle"
-              data-enabled={notifyAlbumActivity}
-              onClick={toggleNotifyAlbumActivity}
-              disabled={isSavingPrefs}
-              role="switch"
-              aria-checked={notifyAlbumActivity}
-            >
-              <span className="notification-pref-knob" />
-              <span className="notification-pref-label">
-                {isSavingPrefs ? <Loader2 size={13} className="spin" /> : null}
-                {notifyAlbumActivity ? t.notificationsOn : t.notificationsOff}
-              </span>
-            </button>
-          </div>
-
-          {/* Sección de Invitaciones y Asociados */}
-          <div style={{ marginBottom: '1.5rem' }}>
+            {/* Sección de Invitaciones y Asociados (Issue #45: dentro del flujo de apartados) */}
+            <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Users size={16} style={{ color: 'var(--accent-cyan)' }} />
@@ -559,6 +624,28 @@ export const UserModal: React.FC<UserModalProps> = ({
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Issue #41: sección privada de administración (solo aparece para admins) */}
+            {userSession.isAdmin && onOpenAdminPanel && (
+              <div style={{ ...sectionCard, border: '1px solid rgba(0, 242, 254, 0.4)', background: 'rgba(0, 242, 254, 0.05)' }}>
+                {sectionTitle(<ShieldCheck size={14} style={{ color: 'var(--accent-cyan)' }} />, t.adminSection)}
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 0.75rem' }}>
+                  {t.adminPanelDesc}
+                </p>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    onClose();
+                    onOpenAdminPanel();
+                  }}
+                >
+                  <ShieldCheck size={15} />
+                  <span>{t.adminOpenPanel}</span>
+                </button>
+              </div>
+            )}
             </div>
           </div>
         </div>

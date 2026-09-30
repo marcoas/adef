@@ -31,6 +31,13 @@ enum NotificationType {
   ACCESS_REVOKED
 }
 
+// Issue #41: estado de la cuenta. RESTRICTED = el admin bloqueó el acceso:
+// el usuario no puede iniciar sesión ni usar ninguna ruta autenticada.
+enum UserStatus {
+  ACTIVE
+  RESTRICTED
+}
+
 model User {
   id            String         @id @default(uuid())
   email         String         @unique
@@ -39,6 +46,12 @@ model User {
   authProvider  String         @default("google") @map("auth_provider")
   // Issue #34: preferencia configurable desde el panel de usuario
   notifyOnAlbumActivity Boolean  @default(true) @map("notify_on_album_activity")
+  // Issue #41: rol de administración (panel privado de administración)
+  isAdmin       Boolean      @default(false) @map("is_admin")
+  // Issue #41: estado de la cuenta (ACTIVE / RESTRICTED por un admin)
+  status        UserStatus   @default(ACTIVE)
+  // Issue #41: último login exitoso, para el dashboard de uso
+  lastLoginAt   DateTime?    @map("last_login_at")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 

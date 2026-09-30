@@ -9,6 +9,8 @@ import { StickerModal, StickerData } from '../components/StickerModal';
 import { LoginModal } from '../components/LoginModal';
 import { InviteModal } from '../components/InviteModal';
 import { UserModal } from '../components/UserModal';
+// Issue #41: panel privado de administración (solo usuarios admin)
+import { AdminPanel } from '../components/AdminPanel';
 import { ActivityLogModal } from '../components/ActivityLogModal';
 import { NotificationItem } from '../components/NotificationsBell';
 import { Locale } from '../lib/i18n';
@@ -17,6 +19,9 @@ interface UserSession {
   email: string;
   name: string;
   avatarUrl?: string;
+  // Issue #41: datos de cuenta para el panel de administración
+  id?: string;
+  isAdmin?: boolean;
 }
 
 export default function HomePage() {
@@ -29,6 +34,8 @@ export default function HomePage() {
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [uploadTargetSlot, setUploadTargetSlot] = useState<number | null>(null);
   const [userSession, setUserSession] = useState<UserSession | null>(null);
+  // Issue #41: panel de administración (solo se muestra para usuarios admin)
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [stickers, setStickers] = useState<Record<number, StickerData>>({});
   // Issue #12: álbumes propios + compartidos y cuál está activo
   const [albums, setAlbums] = useState<AlbumOption[]>([]);
@@ -117,17 +124,43 @@ export default function HomePage() {
     }
   }, []);
 
+  // Issue #41: refrescar datos de cuenta (id, rol admin) desde el backend
+  // para sesiones guardadas antes de que el login empezara a devolverlos.
+  const refreshUserSession = useCallback(async () => {
+    const jwtToken = localStorage.getItem('jwt_token');
+    if (!jwtToken) return;
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+      const res = await fetch(`${apiUrl}/auth/me`, {
+        headers: { Authorization: `Bearer ${jwtToken}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const fresh = data.user as { id?: string; isAdmin?: boolean; name?: string; avatarUrl?: string | null };
+      setUserSession((prev) => {
+        if (!prev) return prev;
+        const next: UserSession = { ...prev, id: fresh.id ?? prev.id, isAdmin: !!fresh.isAdmin };
+        localStorage.setItem('user_session', JSON.stringify(next));
+        return next;
+      });
+    } catch (e) {
+      console.error('Error refrescando la sesión de usuario:', e);
+    }
+  }, []);
+
   useEffect(() => {
     // Restaurar sesión de usuario persistida
     const savedSession = typeof window !== 'undefined' ? localStorage.getItem('user_session') : null;
     if (savedSession) {
       try {
         setUserSession(JSON.parse(savedSession));
+        // Issue #41: completar id/isAdmin si la sesión guardada es antigua
+        void refreshUserSession();
       } catch (e) {
         console.error('Error parseando user_session de localStorage:', e);
       }
     }
-  }, []);
+  }, [refreshUserSession]);
 
   // Issue #7: sin sesión no se conoce "el álbum del usuario", por lo que no se
   // consulta ni se conserva ningún dato (progreso, candados, filtros) y se limpia
@@ -228,6 +261,8 @@ export default function HomePage() {
     localStorage.removeItem('jwt_token');
     setUserSession(null);
     setIsUserModalOpen(false);
+    // Issue #41: al cerrar sesión se cierra también el panel de administración
+    setIsAdminPanelOpen(false);
     // Issue #7: al cerrar sesión se limpian stickers (progreso/candados) en el effect
   };
 
@@ -329,6 +364,16 @@ export default function HomePage() {
         userSession={userSession}
         onLogout={handleLogout}
         onOpenInviteModal={() => setIsInviteOpen(true)}
+        // Issue #41: acceso al panel privado de administración (solo admins)
+        onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
+      />
+
+      {/* Issue #41: panel privado de administración (se abre desde el panel de usuario) */}
+      <AdminPanel
+        isOpen={isAdminPanelOpen && !!userSession?.isAdmin}
+        onClose={() => setIsAdminPanelOpen(false)}
+        locale={locale}
+        currentUserId={userSession?.id ?? null}
       />
 
       {/* Issue #33: log histórico y cronológico de movimientos del álbum */}

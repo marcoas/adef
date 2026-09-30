@@ -26,23 +26,73 @@ const ALLOWED_IMAGE_MIME = ['image/jpeg', 'image/png'];
 interface AuthedRequest extends Request {
   authUserId?: string;
   authEmail?: string;
+  // Issue #41: usuario completo tomado de la BD (rol admin / estado de cuenta)
+  authUser?: {
+    id: string;
+    email: string;
+    name: string;
+    avatarUrl: string | null;
+    authProvider: string;
+    isAdmin: boolean;
+    status: 'ACTIVE' | 'RESTRICTED';
+    lastLoginAt: Date | null;
+  };
 }
+
+// Issue #41: correos (separados por coma) que el sistema marca como admin de
+// forma idempotente en cada login. Es la forma de "sembrar" los primeros
+// administradores sin tocar la base de datos a mano.
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
+  .split(',')
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
 
 // Middleware: exige un JWT válido (Authorization: Bearer <token>) para
 // interactuar con el álbum (cargar / eliminar fotos) - Issue #6
+// Issue #41: además valida que la cuenta exista y no esté RESTRICTED.
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Debes iniciar sesión para interactuar con el álbum.' });
   }
+  let payload: { id?: string; email?: string };
   try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { id?: string; email?: string };
-    (req as AuthedRequest).authUserId = payload.id;
-    (req as AuthedRequest).authEmail = payload.email;
-    next();
+    payload = jwt.verify(header.slice(7), JWT_SECRET) as { id?: string; email?: string };
   } catch (err) {
     return res.status(401).json({ error: 'Sesión inválida o expirada. Inicia sesión nuevamente.' });
   }
+  (req as AuthedRequest).authUserId = payload.id;
+  (req as AuthedRequest).authEmail = payload.email;
+  if (!payload.id) {
+    return res.status(401).json({ error: 'Sesión inválida: el token no identifica a un usuario.' });
+  }
+
+  prisma.user
+    .findUnique({ where: { id: payload.id } })
+    .then((user) => {
+      if (!user) {
+        return res.status(401).json({ error: 'Sesión inválida: el usuario ya no existe.' });
+      }
+      // Issue #41: cuenta restringida por un admin → sin acceso al sistema
+      if (user.status === 'RESTRICTED') {
+        return res.status(403).json({
+          error: 'Tu cuenta está restringida por un administrador. Contactá al administrador del sistema.',
+          accountRestricted: true,
+        });
+      }
+      (req as AuthedRequest).authUser = user;
+      next();
+    })
+    .catch(() => res.status(500).json({ error: 'Error interno al validar la sesión.' }));
+}
+
+// Middleware Issue #41: exige permisos de administrador (usar DESPUÉS de requireAuth)
+function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  const user = (req as AuthedRequest).authUser;
+  if (!user || !user.isAdmin) {
+    return res.status(403).json({ error: 'Requiere permisos de administrador.' });
+  }
+  next();
 }
 
 // Security & Middleware
@@ -55,6 +105,37 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: '25mb' }));
+
+// Issue #41: contador de consumo de la API en memoria para el dashboard de
+// administración. Clave "YYYY-MM-DD|MÉTODO /ruta"; se purga solo lo que
+// supera los 7 días de antigüedad para acotar la memoria.
+const apiUsage: Record<string, { requests: number; errors: number; route: string; day: string }> = {};
+const USAGE_RETENTION_DAYS = 7;
+
+function trackApiUsage(req: Request, res: Response, next: NextFunction) {
+  res.on('finish', () => {
+    try {
+      const now = new Date();
+      const day = now.toISOString().slice(0, 10);
+      // res.route existe solo cuando la petición coincidió con una ruta definida
+      const routePath = (res as any).route?.path as string | undefined;
+      const route = routePath ? `${req.method} ${routePath}` : req.path;
+      const key = `${day}|${route}`;
+      const entry = apiUsage[key] || (apiUsage[key] = { requests: 0, errors: 0, route, day });
+      entry.requests += 1;
+      if (res.statusCode >= 400) entry.errors += 1;
+
+      const cutoff = new Date(now.getTime() - USAGE_RETENTION_DAYS * 86400000).toISOString().slice(0, 10);
+      for (const k of Object.keys(apiUsage)) {
+        if (apiUsage[k].day < cutoff) delete apiUsage[k];
+      }
+    } catch {
+      /* el tracking de consumo nunca debe romper la respuesta */
+    }
+  });
+  next();
+}
+app.use('/api', trackApiUsage);
 
 // Issue #11: servir archivos estáticos con caché de larga duración.
 // Las imágenes son inmutables (nombre con hash aleatorio), por lo que se
@@ -225,12 +306,46 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       });
     }
 
+    // Issue #41: las cuentas restringidas por un admin no pueden iniciar sesión
+    if (user.status === 'RESTRICTED') {
+      return res.status(403).json({
+        error: 'Tu cuenta está restringida por un administrador. Contactá al administrador del sistema.',
+        accountRestricted: true,
+      });
+    }
+
+    // Issue #41: "sembrar" administradores desde el entorno ADMIN_EMAILS (idempotente)
+    if (ADMIN_EMAILS.length > 0 && ADMIN_EMAILS.includes(user.email.toLowerCase()) && !user.isAdmin) {
+      user = await prisma.user.update({ where: { id: user.id }, data: { isAdmin: true } });
+    }
+
+    // Issue #41: registrar último login para el dashboard de uso
+    user = await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+
     const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
     return res.json({ token, user });
   } catch (error) {
     console.error('Error en auth login:', error);
     return res.status(500).json({ error: 'Error al autenticar' });
   }
+});
+
+// Issue #41: sesión actual desde la BD. Permite al frontend refrescar datos
+// de cuenta (rol admin, estado) guardados en sesiones antiguas.
+app.get('/api/auth/me', requireAuth, (req: Request, res: Response) => {
+  const user = (req as AuthedRequest).authUser!;
+  return res.json({
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      avatarUrl: user.avatarUrl,
+      authProvider: user.authProvider,
+      isAdmin: user.isAdmin,
+      status: user.status,
+      lastLoginAt: user.lastLoginAt,
+    },
+  });
 });
 
 // -------------------------------------------------------------
@@ -1095,6 +1210,271 @@ app.get('/api/albums/:albumId/ranking', requireAuth, async (req: Request, res: R
   } catch (error) {
     console.error('Error al obtener el ranking del álbum:', error);
     return res.status(500).json({ error: 'Error al obtener el ranking' });
+  }
+});
+
+// -------------------------------------------------------------
+// Issue #41: PANEL PRIVADO DE ADMINISTRACIÓN
+// Todas las rutas exigen requireAuth + requireAdmin (user.isAdmin).
+// -------------------------------------------------------------
+
+// Dashboard de uso: totales, series de 14 días, consumo de la API
+// (contador en memoria de 7 días) y últimos movimientos del sistema.
+app.get('/api/admin/dashboard', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const [totalUsers, totalAlbums, totalStickers, restrictedUsers, adminUsers] = await Promise.all([
+      prisma.user.count(),
+      prisma.album.count(),
+      prisma.sticker.count(),
+      prisma.user.count({ where: { status: 'RESTRICTED' } }),
+      prisma.user.count({ where: { isAdmin: true } }),
+    ]);
+
+    // Series diarias de los últimos 14 días (usuarios nuevos y figuritas pegadas)
+    const now = new Date();
+    const since = new Date(now.getTime() - 13 * 86400000);
+    since.setHours(0, 0, 0, 0);
+    const [usersRecent, stickersRecent] = await Promise.all([
+      prisma.user.findMany({ where: { createdAt: { gte: since } }, select: { createdAt: true } }),
+      prisma.sticker.findMany({ where: { capturedAt: { gte: since } }, select: { capturedAt: true } }),
+    ]);
+    const dayKey = (d: Date) => new Date(d).toISOString().slice(0, 10);
+    const last14Days: { day: string; users: number; stickers: number }[] = [];
+    for (let i = 13; i >= 0; i -= 1) {
+      last14Days.push({ day: dayKey(new Date(now.getTime() - i * 86400000)), users: 0, stickers: 0 });
+    }
+    const dayMap: Record<string, { day: string; users: number; stickers: number }> = {};
+    for (const d of last14Days) dayMap[d.day] = d;
+    for (const u of usersRecent) {
+      const slot = dayMap[dayKey(u.createdAt)];
+      if (slot) slot.users += 1;
+    }
+    for (const s of stickersRecent) {
+      const slot = dayMap[dayKey(s.capturedAt)];
+      if (slot) slot.stickers += 1;
+    }
+
+    // Consumo de la API agrupado por endpoint (últimos 7 días, en memoria)
+    const byRoute: Record<string, { route: string; requests: number; errors: number; byDay: Record<string, number> }> = {};
+    for (const entry of Object.values(apiUsage)) {
+      const agg = byRoute[entry.route] || (byRoute[entry.route] = { route: entry.route, requests: 0, errors: 0, byDay: {} });
+      agg.requests += entry.requests;
+      agg.errors += entry.errors;
+      agg.byDay[entry.day] = (agg.byDay[entry.day] || 0) + entry.requests;
+    }
+    const apiUsageSummary = Object.values(byRoute)
+      .sort((a, b) => b.requests - a.requests)
+      .map(({ byDay, ...rest }) => ({ ...rest, byDay }));
+
+    // Últimos movimientos del sistema (cualquier álbum)
+    const recentActivity = await prisma.stickerActivity.findMany({
+      take: 8,
+      orderBy: { createdAt: 'desc' },
+      include: { album: { select: { title: true } } },
+    });
+
+    return res.json({
+      totals: { users: totalUsers, albums: totalAlbums, stickers: totalStickers, restrictedUsers, adminUsers },
+      last14Days,
+      apiUsage: apiUsageSummary,
+      recentActivity,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Error en el dashboard de administración:', error);
+    return res.status(500).json({ error: 'Error al obtener el dashboard de administración' });
+  }
+});
+
+// Listado de usuarios (buscable) + con quién comparten su álbum y en qué
+// otros álbumes participan como asociados.
+app.get('/api/admin/users', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const search = ((req.query.search as string) || '').trim();
+    const users = await prisma.user.findMany({
+      where: search
+        ? {
+            OR: [
+              { email: { contains: search, mode: 'insensitive' } },
+              { name: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : undefined,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        // Álbumes propios → con quién los comparte
+        ownedAlbums: {
+          select: {
+            id: true,
+            title: true,
+            createdAt: true,
+            members: {
+              select: {
+                role: true,
+                joinedAt: true,
+                user: { select: { id: true, name: true, email: true, avatarUrl: true } },
+              },
+            },
+          },
+        },
+        // Álbumes de otros en los que participa como asociado
+        memberships: {
+          select: {
+            role: true,
+            joinedAt: true,
+            album: {
+              select: {
+                id: true,
+                title: true,
+                ownerId: true,
+                owner: { select: { name: true, email: true } },
+              },
+            },
+          },
+        },
+        _count: { select: { stickers: true } },
+      },
+    });
+    return res.json({ users });
+  } catch (error) {
+    console.error('Error al listar usuarios (admin):', error);
+    return res.status(500).json({ error: 'Error al listar los usuarios' });
+  }
+});
+
+// Ver el álbum de OTRO usuario (solo admin): miembros, rol y figuritas
+app.get('/api/admin/users/:userId/album', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const target = await prisma.user.findUnique({
+      where: { id: req.params.userId },
+      include: { ownedAlbums: true },
+    });
+    if (!target) return res.status(404).json({ error: 'Usuario no encontrado.' });
+
+    const album = target.ownedAlbums[0] || null;
+    if (!album) {
+      return res.json({
+        user: { id: target.id, name: target.name, email: target.email, avatarUrl: target.avatarUrl },
+        album: null,
+        members: [],
+        stickers: [],
+      });
+    }
+
+    const [members, stickers] = await Promise.all([
+      prisma.albumMember.findMany({
+        where: { albumId: album.id },
+        orderBy: { joinedAt: 'asc' },
+        include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
+      }),
+      prisma.sticker.findMany({
+        where: { albumId: album.id },
+        orderBy: { slotNumber: 'asc' },
+        include: { uploadedBy: { select: { name: true } } },
+      }),
+    ]);
+
+    return res.json({
+      user: { id: target.id, name: target.name, email: target.email, avatarUrl: target.avatarUrl },
+      album: { id: album.id, title: album.title },
+      memberCount: members.length + 1, // +1 por el dueño
+      members,
+      stickers,
+    });
+  } catch (error) {
+    console.error('Error al ver el álbum de otro usuario (admin):', error);
+    return res.status(500).json({ error: 'Error al obtener el álbum del usuario' });
+  }
+});
+
+// Actualizar un usuario: rol de admin y/o estado (restringir / reactivar)
+app.patch('/api/admin/users/:userId', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const admin = (req as AuthedRequest).authUser;
+    const targetId = req.params.userId;
+    const { isAdmin, status } = (req.body || {}) as { isAdmin?: boolean; status?: string };
+
+    if (targetId === admin?.id) {
+      return res.status(400).json({ error: 'No podés modificar tu propia cuenta desde el panel de administración.' });
+    }
+    const target = await prisma.user.findUnique({ where: { id: targetId } });
+    if (!target) return res.status(404).json({ error: 'Usuario no encontrado.' });
+
+    const data: { isAdmin?: boolean; status?: 'ACTIVE' | 'RESTRICTED' } = {};
+    if (typeof isAdmin === 'boolean') {
+      if (isAdmin === false && target.isAdmin) {
+        const activeAdmins = await prisma.user.count({ where: { isAdmin: true } });
+        if (activeAdmins <= 1) {
+          return res.status(400).json({ error: 'No se puede revocar el rol al único administrador del sistema.' });
+        }
+      }
+      data.isAdmin = isAdmin;
+    }
+    if (status !== undefined) {
+      if (status !== 'ACTIVE' && status !== 'RESTRICTED') {
+        return res.status(400).json({ error: 'Estado inválido: use ACTIVE o RESTRICTED.' });
+      }
+      data.status = status;
+    }
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'Nada para actualizar: envíe isAdmin y/o status.' });
+    }
+
+    const updated = await prisma.user.update({ where: { id: targetId }, data });
+    return res.json({
+      user: {
+        id: updated.id,
+        name: updated.name,
+        email: updated.email,
+        isAdmin: updated.isAdmin,
+        status: updated.status,
+      },
+    });
+  } catch (error) {
+    console.error('Error al actualizar usuario (admin):', error);
+    return res.status(500).json({ error: 'Error al actualizar el usuario' });
+  }
+});
+
+// Eliminar un usuario (cancelación total): su álbum, figuritas e imágenes
+// almacenadas se borran (cascade en BD + best effort en disco).
+app.delete('/api/admin/users/:userId', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const admin = (req as AuthedRequest).authUser;
+    const targetId = req.params.userId;
+    if (targetId === admin?.id) {
+      return res.status(400).json({ error: 'No podés eliminar tu propia cuenta desde el panel de administración.' });
+    }
+    const target = await prisma.user.findUnique({
+      where: { id: targetId },
+      include: { stickers: { select: { imageUrl: true, thumbnailUrl: true } } },
+    });
+    if (!target) return res.status(404).json({ error: 'Usuario no encontrado.' });
+
+    // Imágenes de las figuritas pegadas POR este usuario
+    const ownImageUrls: (string | null | undefined)[] = target.stickers.flatMap((s) => [
+      s.imageUrl,
+      s.thumbnailUrl,
+    ]);
+    // Imágenes de todas las figuritas de sus álbumes (pegadas por cualquier miembro)
+    const ownedAlbumIds = await prisma.album.findMany({
+      where: { ownerId: targetId },
+      select: { id: true },
+    });
+    if (ownedAlbumIds.length > 0) {
+      const albumStickers = await prisma.sticker.findMany({
+        where: { albumId: { in: ownedAlbumIds.map((a) => a.id) } },
+        select: { imageUrl: true, thumbnailUrl: true },
+      });
+      ownImageUrls.push(...albumStickers.flatMap((s) => [s.imageUrl, s.thumbnailUrl]));
+    }
+    await deleteStoredImages(...ownImageUrls);
+
+    await prisma.user.delete({ where: { id: targetId } });
+    return res.json({ message: `Usuario ${target.email} eliminado del sistema.` });
+  } catch (error) {
+    console.error('Error al eliminar usuario (admin):', error);
+    return res.status(500).json({ error: 'Error al eliminar el usuario' });
   }
 });
 

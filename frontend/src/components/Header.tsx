@@ -134,6 +134,17 @@ export const Header: React.FC<HeaderProps> = ({
             />
           )}
 
+          {/* Issue #46: "Pegar Figurita" ahora va ANTES del botón de login / menú de usuario */}
+          <button
+            className="btn-primary"
+            onClick={onOpenUpload}
+            title={userSession ? undefined : 'Inicia sesión para pegar una foto'}
+            style={!userSession ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+          >
+            <Camera size={18} />
+            <span>{t.uploadButton}</span>
+          </button>
+
           {/* Issue #15 & #17: Menú de usuario desplegable. Botón muestra SOLO el icono de usuario/OAuth */}
           {userSession ? (
             <div style={{ position: 'relative' }} ref={dropdownRef}>
@@ -214,17 +225,6 @@ export const Header: React.FC<HeaderProps> = ({
               <span>Iniciar Sesión</span>
             </button>
           )}
-
-          {/* Botón Pegar Foto */}
-          <button
-            className="btn-primary"
-            onClick={onOpenUpload}
-            title={userSession ? undefined : 'Inicia sesión para pegar una foto'}
-            style={!userSession ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
-          >
-            <Camera size={18} />
-            <span>{t.uploadButton}</span>
-          </button>
         </div>
       </div>
     </header>
