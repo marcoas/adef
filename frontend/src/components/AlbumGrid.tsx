@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, Sparkles, Lock, BookOpen, ArrowUp, ArrowLeftRight, CheckCircle2, CircleDashed, X, Trophy, LogOut } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 import { StickerData } from './StickerModal';
@@ -61,6 +61,12 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
   const [animatingSlot, setAnimatingSlot] = useState<number | null>(null);
   // Issue #40: popup del ranking de pegatinas (solo álbumes compartidos)
   const [isRankingOpen, setIsRankingOpen] = useState(false);
+  // Issue #50: coordinación entre el scroll (debe DETENERSE) y la carga de la
+  // imagen (lazy) antes de disparar la animación de pegado, para que el efecto
+  // quede visible y no llegue al casillero ya pegado.
+  const recentAddedRef = useRef<number | null>(null);
+  const scrollReadyRef = useRef(false);
+  const imageReadyRef = useRef(false);
   const activeAlbumRole = albums.find((a) => a.id === activeAlbumId)?.role;
   const isSharedAlbum = albums.length > 0 && albums.some((a) => a.role === 'ASSOCIATE');
 
@@ -211,56 +217,97 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
     };
   }, [showQuickJump, userSession]);
 
+  // Issue #50: dispara la animación de pegado sobre un casillero y la limpia
+  // sola. Consume el ref para no re-animarlo en scrolls posteriores.
+  const animateSlot = (slot: number) => {
+    recentAddedRef.current = null;
+    setAnimatingSlot(slot);
+    // Limpiar tras la duración de la animación para que pueda repetirse
+    window.setTimeout(() => {
+      setAnimatingSlot((cur) => (cur === slot ? null : cur));
+    }, 850);
+  };
+
   // Issue #35: al pegar una figurita nueva, limpiar filtros/búsqueda y llevar
   // el scroll hasta el casillero recién cargado para que quede en pantalla.
-  // Issue #50: el scroll se hace PRIMERO y, cuando el movimiento se detiene,
-  // recién ahí se dispara la animación CSS de pegado (animate-paste), para que
-  // el efecto quede visible y no se ejecute fuera de pantalla mientras el
-  // usuario aún está arriba (botón del header).
+  // Issue #50: el orden correcto es PRIMERO el scroll y recién cuando el
+  // movimiento se DETIENE (y la imagen lazy ya cargó) se dispara la animación
+  // de pegado, para que el efecto quede visible y no llegue ya pegado.
   useEffect(() => {
     if (recentAddedSlot === null || recentAddedSlot === undefined) return;
+
+    recentAddedRef.current = recentAddedSlot;
+    scrollReadyRef.current = false;
+    imageReadyRef.current = false;
     setSearchTerm('');
     setFilterType('all');
     // Nunca animar un casillero ya animado del pegado anterior
     setAnimatingSlot(null);
 
     let idleTimer: number | undefined;
+    let scrollTimer: number | undefined;
 
-    // Dispara la animación de pegado sobre el casillero recién cargado
-    const startAnimation = () => {
-      window.clearTimeout(idleTimer);
-      setAnimatingSlot(recentAddedSlot);
-      // Limpiar tras la duración de la animación para que pueda repetirse
-      window.setTimeout(() => {
-        setAnimatingSlot((cur) => (cur === recentAddedSlot ? null : cur));
-      }, 850);
+    // Cuando el scroll se detuvo Y la imagen ya está cargada → animar
+    const tryAnimate = () => {
+      if (!scrollReadyRef.current || !imageReadyRef.current) return;
+      const slot = recentAddedRef.current;
+      if (slot === null || slot === undefined) return;
+      animateSlot(slot);
     };
 
-    // Si el scroll se detiene (sin eventos de scroll por un rato) → animar
+    // Si el scroll se detiene (sin eventos por un rato) → marcar listo
     const onScrollIdle = () => {
       window.clearTimeout(idleTimer);
-      idleTimer = window.setTimeout(startAnimation, 180);
+      idleTimer = window.setTimeout(() => {
+        scrollReadyRef.current = true;
+        tryAnimate();
+      }, 180);
+    };
+
+    // El navegador terminó el scroll suave → listo
+    const onScrollEnd = () => {
+      scrollReadyRef.current = true;
+      tryAnimate();
     };
 
     // Esperar al re-render con filtros limpios antes de buscar el casillero
-    const scrollTimer = window.setTimeout(() => {
-      const target = document.getElementById(`slot-${recentAddedSlot}`);
+    scrollTimer = window.setTimeout(() => {
+      const slot = recentAddedRef.current;
+      if (slot === null || slot === undefined) return;
+      const target = document.getElementById(`slot-${slot}`);
       if (!target) {
         // Casillero no disponible: de todos modos se muestra la animación
-        startAnimation();
+        scrollReadyRef.current = true;
+        imageReadyRef.current = true;
+        tryAnimate();
         return;
       }
-      const top = target.getBoundingClientRect().top + window.scrollY - getStickyOffset();
-      window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
-      window.addEventListener('scroll', onScrollIdle, { passive: true });
-      // Techo de seguridad por si el scroll es mínimo o ya estaba en vista
-      idleTimer = window.setTimeout(startAnimation, 400);
+
+      // Si la imagen ya está cargada (caché) no hace falta esperar el onLoad
+      const img = target.querySelector('.pastable__cover img') as HTMLImageElement | null;
+      if (img && img.complete) imageReadyRef.current = true;
+
+      const rect = target.getBoundingClientRect();
+      const topLimit = getStickyOffset();
+      const alreadyVisible = rect.top >= topLimit && rect.bottom <= window.innerHeight;
+
+      if (alreadyVisible) {
+        // Ya está a la vista: no hace falta scroll, se anima apenas cargue la imagen
+        scrollReadyRef.current = true;
+      } else {
+        const top = rect.top + window.scrollY - topLimit;
+        window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+        window.addEventListener('scroll', onScrollIdle, { passive: true });
+        document.addEventListener('scrollend', onScrollEnd);
+      }
+      tryAnimate();
     }, 120);
 
     return () => {
       window.clearTimeout(scrollTimer);
       window.clearTimeout(idleTimer);
       window.removeEventListener('scroll', onScrollIdle);
+      document.removeEventListener('scrollend', onScrollEnd);
     };
   }, [recentAddedSlot]);
 
@@ -509,6 +556,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                       className="sticker-image"
                       loading="lazy"
                       decoding="async"
+                      onLoad={() => imageReadyRef.current = true}
                     />
                     <div className="plate-badge">
                       {sticker.rawPlate}
