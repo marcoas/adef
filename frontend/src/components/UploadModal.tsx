@@ -276,31 +276,44 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             </div>
           </div>
 
-          {/* Input de Patente - Issue #9: readonly, el valor proviene del OCR */}
+          {/* Input de Patente - Issue #9: readonly, el valor proviene del OCR.
+              Issue #52: label e input unificados en un solo renglón. */}
           <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-              {t.plateInputLabel}
-            </label>
-            <input 
-              type="text" 
-              className="search-input" 
-              placeholder="Procesando foto con OCR..."
-              value={plateInput}
-              readOnly
-              aria-readonly="true"
-              tabIndex={-1}
-              style={{ 
-                paddingLeft: '1rem', 
-                textTransform: 'uppercase', 
-                fontFamily: 'Space Mono', 
-                fontSize: '1.1rem', 
-                letterSpacing: '1px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px dashed var(--border-color)',
-                color: plateInput ? 'var(--text-primary)' : 'var(--text-muted)',
-                cursor: 'default',
-              }}
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <label 
+                htmlFor="plate-input"
+                style={{ 
+                  fontWeight: 600, 
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                {t.plateInputLabel}
+              </label>
+              <input 
+                id="plate-input"
+                type="text" 
+                className="search-input" 
+                placeholder="Procesando foto con OCR..."
+                value={plateInput}
+                readOnly
+                aria-readonly="true"
+                tabIndex={-1}
+                style={{ 
+                  flex: 1,
+                  minWidth: 0,
+                  paddingLeft: '1rem', 
+                  textTransform: 'uppercase', 
+                  fontFamily: 'Space Mono', 
+                  fontSize: '1.1rem', 
+                  letterSpacing: '1px',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px dashed var(--border-color)',
+                  color: plateInput ? 'var(--text-primary)' : 'var(--text-muted)',
+                  cursor: 'default',
+                }}
+              />
+            </div>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
               {plateInput
                 ? <>Patente detectada automáticamente. Casillero asignado: <strong>#{plateInput.match(/\d{3}/)?.[0] || '___'}</strong></>
