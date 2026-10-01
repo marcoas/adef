@@ -56,6 +56,9 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
   const [showScrollTop, setShowScrollTop] = useState(false);
   // Issue #32: centena activa según la posición del scroll
   const [activeGroup, setActiveGroup] = useState<number | null>(null);
+  // Issue #50: casillero al que se le dispara la animación de pegado (solo
+  // DESPUÉS de que el scroll hacia él se detuvo, para que el efecto se vea).
+  const [animatingSlot, setAnimatingSlot] = useState<number | null>(null);
   // Issue #40: popup del ranking de pegatinas (solo álbumes compartidos)
   const [isRankingOpen, setIsRankingOpen] = useState(false);
   const activeAlbumRole = albums.find((a) => a.id === activeAlbumId)?.role;
@@ -210,18 +213,55 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
 
   // Issue #35: al pegar una figurita nueva, limpiar filtros/búsqueda y llevar
   // el scroll hasta el casillero recién cargado para que quede en pantalla.
+  // Issue #50: el scroll se hace PRIMERO y, cuando el movimiento se detiene,
+  // recién ahí se dispara la animación CSS de pegado (animate-paste), para que
+  // el efecto quede visible y no se ejecute fuera de pantalla mientras el
+  // usuario aún está arriba (botón del header).
   useEffect(() => {
     if (recentAddedSlot === null || recentAddedSlot === undefined) return;
     setSearchTerm('');
     setFilterType('all');
+    // Nunca animar un casillero ya animado del pegado anterior
+    setAnimatingSlot(null);
+
+    let idleTimer: number | undefined;
+
+    // Dispara la animación de pegado sobre el casillero recién cargado
+    const startAnimation = () => {
+      window.clearTimeout(idleTimer);
+      setAnimatingSlot(recentAddedSlot);
+      // Limpiar tras la duración de la animación para que pueda repetirse
+      window.setTimeout(() => {
+        setAnimatingSlot((cur) => (cur === recentAddedSlot ? null : cur));
+      }, 850);
+    };
+
+    // Si el scroll se detiene (sin eventos de scroll por un rato) → animar
+    const onScrollIdle = () => {
+      window.clearTimeout(idleTimer);
+      idleTimer = window.setTimeout(startAnimation, 180);
+    };
+
     // Esperar al re-render con filtros limpios antes de buscar el casillero
-    const timer = setTimeout(() => {
+    const scrollTimer = window.setTimeout(() => {
       const target = document.getElementById(`slot-${recentAddedSlot}`);
-      if (!target) return;
+      if (!target) {
+        // Casillero no disponible: de todos modos se muestra la animación
+        startAnimation();
+        return;
+      }
       const top = target.getBoundingClientRect().top + window.scrollY - getStickyOffset();
       window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+      window.addEventListener('scroll', onScrollIdle, { passive: true });
+      // Techo de seguridad por si el scroll es mínimo o ya estaba en vista
+      idleTimer = window.setTimeout(startAnimation, 400);
     }, 120);
-    return () => clearTimeout(timer);
+
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(idleTimer);
+      window.removeEventListener('scroll', onScrollIdle);
+    };
   }, [recentAddedSlot]);
 
   return (
@@ -461,7 +501,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
             >
               {sticker && userSession ? (
                 /* Issue #30: pegado con doblez diagonal (ver .pastable en globals.css) */
-                <div className={`pastable ${recentAddedSlot === slot ? 'animate-paste' : ''}`}>
+                <div className={`pastable ${animatingSlot === slot ? 'animate-paste' : ''}`}>
                   <div className="pastable__cover">
                     <img 
                       src={sticker.thumbnailUrl || sticker.imageUrl} 
