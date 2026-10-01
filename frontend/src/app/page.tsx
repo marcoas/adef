@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Header } from '../components/Header';
 import { AlbumGrid, AlbumOption } from '../components/AlbumGrid';
@@ -201,8 +201,24 @@ export default function HomePage() {
   };
 
   const [recentAddedSlot, setRecentAddedSlot] = useState<number | null>(null);
+  // Issue #53: casillero detectado por el OCR mientras el popup de captura sigue
+  // abierto. Permite scrollear el álbum hasta él antes de que el usuario confirme.
+  // El nonce fuerza un nuevo scroll aun si se repite el mismo casillero.
+  const [previewSlot, setPreviewSlot] = useState<{ slot: number; nonce: number } | null>(null);
+  const previewNonceRef = useRef(0);
   // Issue #34: casillero a abrir cuando la notificación apunta a otro álbum
   const [pendingNotificationSlot, setPendingNotificationSlot] = useState<number | null>(null);
+
+  // Issue #53: el OCR informa el casillero leído; el álbum se desplaza hasta él
+  // mientras el popup sigue abierto. Sin dígitos (o patente vacía) → null.
+  const handlePlateDetected = useCallback((slotNumber: number | null) => {
+    if (slotNumber === null) {
+      setPreviewSlot(null);
+      return;
+    }
+    previewNonceRef.current += 1;
+    setPreviewSlot({ slot: slotNumber, nonce: previewNonceRef.current });
+  }, []);
 
   const handleStickerAdded = (slotNumber: number, rawPlate: string, imageUrl: string) => {
     setStickers((prev) => ({
@@ -217,6 +233,8 @@ export default function HomePage() {
     }));
     setRecentAddedSlot(slotNumber);
     setTimeout(() => setRecentAddedSlot(null), 800);
+    // Issue #53: la patente ya quedó pegada, el scroll previo cumplió su propósito
+    setPreviewSlot(null);
     // Re-sincronizar con PostgreSQL
     fetchAlbumFromPostgreSQL();
   };
@@ -272,6 +290,8 @@ export default function HomePage() {
       setIsLoginOpen(true);
       return;
     }
+    // Issue #53: cada apertura arranca sin casillero previsualizado
+    setPreviewSlot(null);
     setIsUploadOpen(true);
   };
 
@@ -282,6 +302,7 @@ export default function HomePage() {
     if (stickers[slot]) {
       setSelectedSlot(slot);
     } else {
+      setPreviewSlot(null);
       setUploadTargetSlot(slot);
       setIsUploadOpen(true);
     }
@@ -314,6 +335,7 @@ export default function HomePage() {
         activeAlbumId={activeAlbumId}
         onChangeAlbum={handleChangeAlbum}
         recentAddedSlot={recentAddedSlot}
+        previewSlot={previewSlot}
         onOpenActivityLog={() => setIsActivityLogOpen(true)}
       />
 
@@ -323,11 +345,15 @@ export default function HomePage() {
         onClose={() => {
           setIsUploadOpen(false);
           setUploadTargetSlot(null);
+          // Issue #53: al cerrar el popup se descarta el casillero previsualizado
+          setPreviewSlot(null);
         }}
         locale={locale}
         onStickerAdded={handleStickerAdded}
         targetSlot={uploadTargetSlot}
         albumId={activeAlbumId}
+        // Issue #53: el OCR informa el casillero detectado para scrollear el álbum
+        onPlateDetected={handlePlateDetected}
       />
 
       {/* Modal Detalle de Casillero / Figurita */}

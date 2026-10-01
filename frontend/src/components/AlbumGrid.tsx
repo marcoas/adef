@@ -30,6 +30,12 @@ interface AlbumGridProps {
   activeAlbumId?: string | null;
   onChangeAlbum?: (albumId: string) => void;
   recentAddedSlot?: number | null;
+  // Issue #53: casillero que el OCR ya detectó mientras el popup de captura sigue
+  // abierto. Se desplaza el álbum hasta él para que quede a la vista ANTES de
+  // que el usuario confirme, sin disparar todavía la animación de pegado.
+  // Se incluye un nonce para que re-detectar la MISMA patente (por ejemplo tras
+  // cambiar de foto) vuelva a disparar el scroll, ya que el valor no cambia.
+  previewSlot?: { slot: number; nonce: number } | null;
   // Issue #33: acceso al log histórico de movimientos del álbum
   onOpenActivityLog?: () => void;
 }
@@ -47,6 +53,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
   activeAlbumId = null,
   onChangeAlbum,
   recentAddedSlot,
+  previewSlot,
   onOpenActivityLog,
 }) => {
   const t = getTranslation(locale);
@@ -227,6 +234,32 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
       setAnimatingSlot((cur) => (cur === slot ? null : cur));
     }, 850);
   };
+
+  // Issue #53: mientras el popup de captura sigue abierto, apenas el OCR detecta
+  // la patente se limpia cualquier filtro activo y se desplaza el álbum hasta el
+  // casillero detectado para que quede a la vista. NO se dispara la animación de
+  // pegado acá: esa corre recién cuando el usuario confirma (recentAddedSlot).
+  useEffect(() => {
+    if (!previewSlot) return;
+    if (previewSlot.slot === recentAddedRef.current) return;
+
+    const slot = previewSlot.slot;
+
+    // Sin estos filtros el casillero podría no existir en el DOM
+    setSearchTerm('');
+    setFilterType('all');
+
+    // Esperar al re-render con los filtros ya limpiados
+    const timer = window.setTimeout(() => {
+      const target = document.getElementById(`slot-${slot}`);
+      if (!target) return;
+
+      const top = target.getBoundingClientRect().top + window.scrollY - getStickyOffset();
+      window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [previewSlot]);
 
   // Issue #35: al pegar una figurita nueva, limpiar filtros/búsqueda y llevar
   // el scroll hasta el casillero recién cargado para que quede en pantalla.

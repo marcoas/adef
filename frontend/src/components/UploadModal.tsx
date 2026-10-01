@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, Upload, CheckCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 
@@ -12,6 +12,10 @@ interface UploadModalProps {
   targetSlot?: number | null;
   // Issue #12: álbum destino (compartido) al que se sube la figurita
   albumId?: string | null;
+  // Issue #53: avisa el casillero que el OCR está detectando (o null si todavía
+  // no hay patente legible) para que el álbum pueda desplazarse hasta él
+  // mientras el popup sigue abierto, antes de que el usuario confirme.
+  onPlateDetected?: (slotNumber: number | null) => void;
 }
 
 export const UploadModal: React.FC<UploadModalProps> = ({
@@ -21,6 +25,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   onStickerAdded,
   targetSlot = null,
   albumId = null,
+  onPlateDetected,
 }) => {
   const t = getTranslation(locale);
   const [plateInput, setPlateInput] = useState('');
@@ -29,6 +34,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const imageRef = useRef<HTMLImageElement | null>(null);
+
+  // Issue #53: en cuanto el OCR entrega una patente con 3 dígitos se informa el
+  // casillero correspondiente para que el álbum se desplace hasta él mientras el
+  // popup sigue abierto. Si la patente cambia o se limpia, se informa null.
+  useEffect(() => {
+    if (!onPlateDetected) return;
+    const digitMatch = plateInput.match(/\d{3}/);
+    onPlateDetected(digitMatch ? parseInt(digitMatch[0], 10) : null);
+  }, [plateInput, onPlateDetected]);
 
   // Issue #10: solo se aceptan imágenes JPG o PNG y de hasta 5 MB
   const MAX_FILE_SIZE_MB = 5;
