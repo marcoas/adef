@@ -20,7 +20,6 @@ interface StickerModalProps {
   isOpen: boolean;
   onClose: () => void;
   locale: Locale;
-  onOpenUploadForSlot: (slot: number) => void;
   onStickerDeleted?: (slotNumber: number) => void;
   isOwner?: boolean;
   // Issue #12: álbum activo (compartido) para eliminar figuritas
@@ -33,7 +32,6 @@ export const StickerModal: React.FC<StickerModalProps> = ({
   isOpen,
   onClose,
   locale,
-  onOpenUploadForSlot,
   onStickerDeleted,
   isOwner = true,
   albumId = null,
@@ -131,7 +129,7 @@ export const StickerModal: React.FC<StickerModalProps> = ({
             </button>
           </div>
 
-          {sticker ? (
+          {sticker && (
             <div>
               <div
                 ref={peelRef}
@@ -191,23 +189,6 @@ export const StickerModal: React.FC<StickerModalProps> = ({
                 {t.close}
               </button>
             </div>
-          </div>
-        ) : (
-          <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-              El casillero <strong>#{formattedSlot}</strong> aún no posee ninguna figurita pegada.
-            </p>
-            
-            <button 
-              className="btn-primary" 
-              onClick={() => {
-                onClose();
-                onOpenUploadForSlot(slotNumber);
-              }}
-              style={{ width: '100%', justifyContent: 'center' }}
-            >
-              {t.pasteSticker}
-            </button>
           </div>
         )}
       </div>

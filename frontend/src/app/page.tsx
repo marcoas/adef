@@ -275,6 +275,18 @@ export default function HomePage() {
     setIsUploadOpen(true);
   };
 
+  // Issue #51: al hacer clic en un casillero vacío no se abre el popup
+  // "casillero vacío": se pasa directamente a "Pegar Figurita" para ese casillero.
+  const handleSlotClick = (slot: number) => {
+    if (!userSession) return;
+    if (stickers[slot]) {
+      setSelectedSlot(slot);
+    } else {
+      setUploadTargetSlot(slot);
+      setIsUploadOpen(true);
+    }
+  };
+
   return (
     <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Header Principal con Auth y Menú de Usuario (Issue #15) */}
@@ -295,7 +307,7 @@ export default function HomePage() {
       <AlbumGrid 
         locale={locale}
         stickers={stickers}
-        onSlotClick={(slot) => setSelectedSlot(slot)}
+        onSlotClick={handleSlotClick}
         userSession={userSession}
         onOpenLogin={() => setIsLoginOpen(true)}
         albums={albums}
@@ -325,15 +337,6 @@ export default function HomePage() {
         isOpen={selectedSlot !== null}
         onClose={() => setSelectedSlot(null)}
         locale={locale}
-        onOpenUploadForSlot={(slot) => {
-          setSelectedSlot(null);
-          if (!userSession) {
-            setIsLoginOpen(true);
-            return;
-          }
-          setUploadTargetSlot(slot);
-          setIsUploadOpen(true);
-        }}
         onStickerDeleted={handleStickerDeleted}
         // Issue #12: en un álbum compartido el invitado no puede eliminar
         isOwner={!!userSession && isActiveAlbumOwner}
