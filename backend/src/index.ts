@@ -845,6 +845,84 @@ app.put('/api/users/me/preferences', requireAuth, async (req: Request, res: Resp
 });
 
 // -------------------------------------------------------------
+// Issue #54: AUTOELIMINACIÓN DE LA CUENTA (irreversible)
+// El usuario puede darse de baja definitiva desde su panel. La baja elimina:
+//   - Su cuenta y datos personales.
+//   - Su álbum y TODAS sus figuritas (incluidas las pegadas por asociados).
+//   - Su acceso como asociado a los álbumes de otros usuarios.
+//   - El acceso de sus asociados a su álbum (el álbum deja de existir).
+// El schema Prisma define los `onDelete: Cascade` necesarios; las imágenes
+// se borran del almacenamiento local/Cloudinary en modo best effort.
+// -------------------------------------------------------------
+
+/**
+ * Baja definitiva de una cuenta. La comparten la autoeliminación del propio
+ * usuario (Issue #54) y la baja desde el panel de administración (Issue #41).
+ *
+ * Flujo:
+ *   1. Recopila las URLs de imagen de las figuritas pegadas POR el usuario
+ *      (en cualquier álbum) y de todas las figuritas de sus álbumes.
+ *   2. Borra esas imágenes del disco/Cloudinary (best effort: un fallo aquí
+ *      no interrumpe la baja; solo se loguea).
+ *   3. Elimina el usuario en BD: los `onDelete: Cascade` del schema borran
+ *      su álbum (y con él sus figuritas, miembros e invitaciones), sus
+ *      membresías en álbumes ajenos, sus notificaciones y sus invitaciones.
+ *      El log de movimientos conserva `userName` por snapshot (userId → null)
+ *      y los invites usados quedan con usedBy en null (SetNull).
+ *
+ * @param targetId id del usuario a eliminar
+ * @returns el email del usuario eliminado, o `null` si la cuenta no existe
+ */
+async function deleteAccountCascade(targetId: string): Promise<{ email: string } | null> {
+  const target = await prisma.user.findUnique({
+    where: { id: targetId },
+    include: { stickers: { select: { imageUrl: true, thumbnailUrl: true } } },
+  });
+  if (!target) return null;
+
+  // Imágenes de las figuritas pegadas POR este usuario (en cualquier álbum)
+  const imageUrls: (string | null | undefined)[] = target.stickers.flatMap((s) => [
+    s.imageUrl,
+    s.thumbnailUrl,
+  ]);
+  // Imágenes de todas las figuritas de sus álbumes (pegadas por cualquier miembro)
+  const ownedAlbumIds = await prisma.album.findMany({
+    where: { ownerId: targetId },
+    select: { id: true },
+  });
+  if (ownedAlbumIds.length > 0) {
+    const albumStickers = await prisma.sticker.findMany({
+      where: { albumId: { in: ownedAlbumIds.map((a) => a.id) } },
+      select: { imageUrl: true, thumbnailUrl: true },
+    });
+    imageUrls.push(...albumStickers.flatMap((s) => [s.imageUrl, s.thumbnailUrl]));
+  }
+  await deleteStoredImages(...imageUrls);
+
+  await prisma.user.delete({ where: { id: targetId } });
+  return { email: target.email };
+}
+
+// Autoeliminación: el usuario autenticado borra SU propia cuenta.
+// Es la vía "self-service" del Issue #54 (la vía administrativa está en
+// DELETE /api/admin/users/:userId y rechaza eliminarse a sí mismo).
+app.delete('/api/users/me', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as AuthedRequest).authUserId!;
+
+    const deleted = await deleteAccountCascade(userId);
+    if (!deleted) return res.status(401).json({ error: 'Usuario no encontrado.' });
+
+    return res.json({
+      message: 'Tu cuenta, tu álbum y tus figuritas fueron eliminados definitivamente.',
+    });
+  } catch (error) {
+    console.error('Error al autoeliminar la cuenta:', error);
+    return res.status(500).json({ error: 'Error al eliminar la cuenta' });
+  }
+});
+
+// -------------------------------------------------------------
 // Issue #12: INVITACIONES DE ASOCIADOS (links únicos de un solo uso)
 // -------------------------------------------------------------
 const INVITE_TTL_DAYS = 7;
@@ -1476,7 +1554,9 @@ app.patch('/api/admin/users/:userId', requireAuth, requireAdmin, async (req: Req
 });
 
 // Eliminar un usuario (cancelación total): su álbum, figuritas e imágenes
-// almacenadas se borran (cascade en BD + best effort en disco).
+// almacenadas se borran (cascade en BD + best effort en disco). La lógica
+// es común con la autoeliminación del usuario (Issue #54) y vive en
+// deleteAccountCascade().
 app.delete('/api/admin/users/:userId', requireAuth, requireAdmin, async (req: Request, res: Response) => {
   try {
     const admin = (req as AuthedRequest).authUser;
@@ -1484,33 +1564,11 @@ app.delete('/api/admin/users/:userId', requireAuth, requireAdmin, async (req: Re
     if (targetId === admin?.id) {
       return res.status(400).json({ error: 'No podés eliminar tu propia cuenta desde el panel de administración.' });
     }
-    const target = await prisma.user.findUnique({
-      where: { id: targetId },
-      include: { stickers: { select: { imageUrl: true, thumbnailUrl: true } } },
-    });
-    if (!target) return res.status(404).json({ error: 'Usuario no encontrado.' });
 
-    // Imágenes de las figuritas pegadas POR este usuario
-    const ownImageUrls: (string | null | undefined)[] = target.stickers.flatMap((s) => [
-      s.imageUrl,
-      s.thumbnailUrl,
-    ]);
-    // Imágenes de todas las figuritas de sus álbumes (pegadas por cualquier miembro)
-    const ownedAlbumIds = await prisma.album.findMany({
-      where: { ownerId: targetId },
-      select: { id: true },
-    });
-    if (ownedAlbumIds.length > 0) {
-      const albumStickers = await prisma.sticker.findMany({
-        where: { albumId: { in: ownedAlbumIds.map((a) => a.id) } },
-        select: { imageUrl: true, thumbnailUrl: true },
-      });
-      ownImageUrls.push(...albumStickers.flatMap((s) => [s.imageUrl, s.thumbnailUrl]));
-    }
-    await deleteStoredImages(...ownImageUrls);
+    const deleted = await deleteAccountCascade(targetId);
+    if (!deleted) return res.status(404).json({ error: 'Usuario no encontrado.' });
 
-    await prisma.user.delete({ where: { id: targetId } });
-    return res.json({ message: `Usuario ${target.email} eliminado del sistema.` });
+    return res.json({ message: `Usuario ${deleted.email} eliminado del sistema.` });
   } catch (error) {
     console.error('Error al eliminar usuario (admin):', error);
     return res.status(500).json({ error: 'Error al eliminar el usuario' });

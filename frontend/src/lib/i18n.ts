@@ -176,6 +176,15 @@ export const translations = {
     adminDeleteSuccess: 'Usuario eliminado del sistema.',
     adminLoading: 'Cargando datos...',
     adminActionError: 'Ocurrió un error al ejecutar la acción.',
+    // Issue #54: autoeliminación de la cuenta desde el panel de usuario
+    dangerZone: 'Zona de peligro',
+    deleteAccount: 'Eliminar mi cuenta',
+    deleteAccountDesc: 'Eliminá tu cuenta de forma definitiva: se borrará tu álbum y todas sus figuritas, tus invitaciones y el acceso de tus asociados a tu álbum. Esta acción es irreversible.',
+    deleteAccountConfirmTitle: 'Eliminar mi cuenta',
+    deleteAccountConfirmMsg: '¿Seguro que querés eliminar tu cuenta de forma definitiva',
+    deleteAccountConfirmHint: 'Se eliminarán tu cuenta, tu álbum, tus figuritas pegadas y el acceso de tus asociados a tu álbum. Esta acción no se puede deshacer.',
+    deleteAccountSuccess: 'Tu cuenta fue eliminada definitivamente.',
+    deleteAccountError: 'No se pudo eliminar la cuenta.',
   },
   en: {
     appTitle: 'License Plate Album',
@@ -347,6 +356,15 @@ export const translations = {
     adminDeleteSuccess: 'User removed from the system.',
     adminLoading: 'Loading data...',
     adminActionError: 'An error occurred while performing the action.',
+    // Issue #54: self account deletion from the user panel
+    dangerZone: 'Danger zone',
+    deleteAccount: 'Delete my account',
+    deleteAccountDesc: 'Permanently delete your account: your album and all its stickers, your invitations and your associates\' access to your album will be erased. This action is irreversible.',
+    deleteAccountConfirmTitle: 'Delete my account',
+    deleteAccountConfirmMsg: 'Are you sure you want to permanently delete your account',
+    deleteAccountConfirmHint: 'Your account, album, pasted stickers and your associates\' access to your album will be erased. This action cannot be undone.',
+    deleteAccountSuccess: 'Your account has been permanently deleted.',
+    deleteAccountError: 'The account could not be deleted.',
   },
 };
 

@@ -3,9 +3,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   X, Mail, Globe, Users, Trash2, Copy, Check,
-  Share2, Plus, AlertCircle, Loader2, LogOut, ShieldCheck, Link2, Bell, Sun, Moon
+  Share2, Plus, AlertCircle, AlertTriangle, Loader2, LogOut, ShieldCheck, Link2, Bell, Sun, Moon
 } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
+// Issue #54: popup de confirmación para la baja definitiva de la cuenta
+import { ConfirmDialog } from './ConfirmDialog';
 // Issue #43: el cambio de tema se expone desde el panel de usuario
 import { Theme, getStoredTheme, applyTheme } from '../lib/theme';
 
@@ -88,6 +90,11 @@ export const UserModal: React.FC<UserModalProps> = ({
     setTheme(next);
     applyTheme(next);
   };
+
+  // Issue #54: estado del popup de confirmación de autoeliminación de cuenta
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
 
   // Issue #45: tarjetas pequeñas y separadas para cada apartado del panel
   const sectionCard: React.CSSProperties = {
@@ -200,6 +207,34 @@ export const UserModal: React.FC<UserModalProps> = ({
       });
     } finally {
       setIsSavingPrefs(false);
+    }
+  };
+
+  // Issue #54: baja definitiva e irreversible de la propia cuenta.
+  // DELETE /api/users/me borra la cuenta, el álbum, las figuritas y los
+  // accesos en el backend; si responde OK se limpia la sesión local (logout).
+  const handleDeleteAccount = async () => {
+    if (isDeletingAccount) return;
+    setIsDeletingAccount(true);
+    setDeleteAccountError(null);
+    try {
+      const res = await fetch(`${apiUrl}/users/me`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(body.error || t.deleteAccountError);
+
+      // La cuenta ya no existe: se cierra el popup, se avisa y se limpia la sesión
+      setIsDeleteDialogOpen(false);
+      window.alert(t.deleteAccountSuccess);
+      onClose();
+      onLogout();
+    } catch (err) {
+      // El error queda visible dentro del popup de confirmación
+      setDeleteAccountError(err instanceof Error ? err.message : t.deleteAccountError);
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -634,6 +669,26 @@ export const UserModal: React.FC<UserModalProps> = ({
                 </button>
               </div>
             )}
+
+            {/* Issue #54: zona de peligro — autoeliminación definitiva de la cuenta */}
+            <div style={{ ...sectionCard, border: '1px solid rgba(239, 68, 68, 0.45)', background: 'rgba(239, 68, 68, 0.07)' }}>
+              {sectionTitle(<AlertTriangle size={14} style={{ color: '#EF4444' }} />, t.dangerZone)}
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 0.75rem', lineHeight: 1.5 }}>
+                {t.deleteAccountDesc}
+              </p>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setDeleteAccountError(null);
+                  setIsDeleteDialogOpen(true);
+                }}
+                style={{ color: '#EF4444', borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)' }}
+              >
+                <Trash2 size={15} />
+                <span>{t.deleteAccount}</span>
+              </button>
+            </div>
             </div>
           </div>
         </div>
@@ -657,6 +712,25 @@ export const UserModal: React.FC<UserModalProps> = ({
             {t.close}
           </button>
         </div>
+
+        {/* Issue #54: confirmación de la baja definitiva de la cuenta (irreversible) */}
+        <ConfirmDialog
+          isOpen={isDeleteDialogOpen}
+          locale={locale}
+          title={t.deleteAccountConfirmTitle}
+          message={t.deleteAccountConfirmMsg}
+          hint={t.deleteAccountConfirmHint}
+          confirmLabel={t.deleteAccount}
+          cancelLabel={t.cancel}
+          isProcessing={isDeletingAccount}
+          errorMessage={deleteAccountError}
+          onConfirm={handleDeleteAccount}
+          onCancel={() => {
+            if (isDeletingAccount) return;
+            setIsDeleteDialogOpen(false);
+            setDeleteAccountError(null);
+          }}
+        />
       </div>
     </div>
   );
