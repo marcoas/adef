@@ -21,7 +21,7 @@ Webapp lúdica y familiar (responsive mobile y desktop) inspirada en el concepto
 * **Base de Datos:** Supabase / Neon (Free Tier).
 
 ## Reglas de Negocio y Funcionalidades
-1. **Autenticación:** Sistema centralizado mediante OAuth (Google, Facebook, Apple) integrado (ej. NextAuth o Supabase Auth).
+1. **Autenticación:** Sistema centralizado mediante OAuth con Google (Google Identity Services) como único proveedor de login; el backend emite un JWT propio.
 2. **Estructura del Álbum:**
    * Cada usuario registrado posee **un único álbum**.
    * El álbum contiene exactamente **1000 casilleros numerados del 000 al 999** (basados en los últimos 3 dígitos numéricos de la patente).

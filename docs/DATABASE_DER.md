@@ -24,7 +24,7 @@ erDiagram
         string email UK "Correo electrónico (OAuth / local)"
         string name "Nombre o apodo del usuario"
         string avatar_url "URL de avatar"
-        string auth_provider "google / facebook / github / local"
+        string auth_provider "google (histórico: facebook / github / local)"
         boolean notify_on_album_activity "Avisos de actividad #34 (default true)"
         boolean is_admin "Rol de administración #41 (default false)"
         enum status "ACTIVE | RESTRICTED #41 (default ACTIVE)"

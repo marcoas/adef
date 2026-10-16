@@ -2,14 +2,14 @@
 
 /**
  * Modal de inicio de sesión (#6).
- * Ofrece los métodos habilitados por el backend (OAuth Google / Facebook /
- * GitHub o email), maneja carga y errores, y al autenticar con éxito
- * persiste `jwt_token` y `user_session` en localStorage antes de notificar
- * al padre vía onLoginSuccess.
+ * Único método habilitado: OAuth con Google (Google Identity Services).
+ * Maneja carga y errores y, al autenticar con éxito, persiste `jwt_token` y
+ * `user_session` en localStorage antes de notificar al padre vía
+ * onLoginSuccess.
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, LogIn, ShieldCheck, AlertCircle, Loader2, Github, Facebook } from 'lucide-react';
+import { X, LogIn, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
 
 declare global {
@@ -60,39 +60,29 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleOAuthLogin = async (provider: 'google' | 'facebook' | 'github') => {
+  const handleGoogleLogin = async () => {
     setIsLoading(true);
-    setActiveProvider(provider);
+    setActiveProvider('google');
     setErrorMessage(null);
 
-    if (provider === 'google') {
-      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
-      if (!clientId || clientId === 'your_google_client_id_here.apps.googleusercontent.com') {
-        setIsLoading(false);
-        setActiveProvider(null);
-        setErrorMessage('Google OAuth no está configurado: falta NEXT_PUBLIC_GOOGLE_CLIENT_ID en el entorno del frontend.');
-        return;
-      }
-      if (window.google?.accounts?.oauth2) {
-        // Popup real de Google con selector de cuenta (One Tap / prompt() no siempre se muestra)
-        openGoogleAccountChooser(clientId);
-        return;
-      }
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+    if (!clientId || clientId === 'your_google_client_id_here.apps.googleusercontent.com') {
       setIsLoading(false);
       setActiveProvider(null);
-      setErrorMessage('El SDK de Google aún se está cargando. Reintenta en unos segundos.');
+      setErrorMessage('Google OAuth no está configurado: falta NEXT_PUBLIC_GOOGLE_CLIENT_ID en el entorno del frontend.');
       return;
-    } else if (provider === 'facebook') {
-      // Flujo OAuth Facebook
-      await executeOAuthBackendLogin('facebook', 'Usuario Facebook', 'usuario_facebook@patentes.ar');
-    } else if (provider === 'github') {
-      // Flujo OAuth GitHub
-      await executeOAuthBackendLogin('github', 'Usuario GitHub', 'usuario_github@patentes.ar');
     }
+    if (window.google?.accounts?.oauth2) {
+      // Popup real de Google con selector de cuenta (One Tap / prompt() no siempre se muestra)
+      openGoogleAccountChooser(clientId);
+      return;
+    }
+    setIsLoading(false);
+    setActiveProvider(null);
+    setErrorMessage('El SDK de Google aún se está cargando. Reintenta en unos segundos.');
   };
 
   const executeOAuthBackendLogin = async (
-    provider: string,
     defaultName: string,
     defaultEmail: string,
     avatarOverride?: string,
@@ -105,18 +95,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         body: JSON.stringify({
           email: defaultEmail,
           name: defaultName,
-          avatarUrl: avatarOverride
-            || (provider === 'github'
-              ? 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=150&auto=format&fit=crop&q=80'
-              : provider === 'facebook'
-              ? 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80'
-              : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'),
-          authProvider: provider,
+          avatarUrl:
+            avatarOverride ||
+            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+          authProvider: 'google',
         }),
       });
 
       if (!res.ok) {
-        throw new Error(`Error al autenticar con proveedor ${provider}`);
+        throw new Error('Error al autenticar con Google');
       }
 
       const data = await res.json();
@@ -129,8 +116,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       }
       onClose();
     } catch (err: any) {
-      console.error(`Error OAuth ${provider}:`, err);
-      setErrorMessage(err.message || `No se pudo completar el login con ${provider}`);
+      console.error('Error OAuth google:', err);
+      setErrorMessage(err.message || 'No se pudo completar el login con Google');
     } finally {
       setIsLoading(false);
       setActiveProvider(null);
@@ -160,7 +147,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           }
           const profile = await profileRes.json();
           await executeOAuthBackendLogin(
-            'google',
             profile.name || profile.email,
             profile.email,
             profile.picture,
@@ -182,7 +168,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <LogIn size={22} style={{ color: 'var(--accent-cyan)' }} />
-            <h2 className="modal-title">Iniciar Sesión con OAuth</h2>
+            <h2 className="modal-title">Iniciar Sesión</h2>
           </div>
           <button className="close-btn" onClick={onClose}>
             <X size={20} />
@@ -190,7 +176,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         </div>
 
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-          Selecciona tu proveedor de identidad preferido para ingresar a tu álbum y colaborar con tus asociados.
+          Inicia sesión con tu cuenta de Google para acceder a tu álbum y colaborar con tus asociados.
         </p>
 
         {errorMessage && (
@@ -211,13 +197,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           </div>
         )}
 
-        {/* Botones de Proveedores OAuth Exclusivos */}
+        {/* Botón de inicio de sesión con Google */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '1rem' }}>
           {/* Google OAuth */}
           <button 
             type="button" 
             className="btn-secondary"
-            onClick={() => handleOAuthLogin('google')}
+            onClick={handleGoogleLogin}
             disabled={isLoading}
                         style={{ 
               width: '100%', 
@@ -234,54 +220,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               <ShieldCheck size={18} style={{ color: '#4285F4' }} />
             )}
             <span>{isLoading && activeProvider === 'google' ? 'Conectando con Google...' : 'Continuar con Google'}</span>
-          </button>
-
-          {/* Facebook OAuth */}
-          <button 
-            type="button" 
-            className="btn-secondary"
-            onClick={() => handleOAuthLogin('facebook')}
-            disabled={isLoading}
-            style={{ 
-              width: '100%', 
-              justifyContent: 'center', 
-              background: '#1877F2', 
-              color: '#FFFFFF', 
-              borderColor: '#1877F2',
-              fontWeight: 700,
-              padding: '0.75rem 1rem'
-            }}
-          >
-            {isLoading && activeProvider === 'facebook' ? (
-              <Loader2 size={18} className="animate-spin" style={{ color: '#FFFFFF' }} />
-            ) : (
-              <Facebook size={18} style={{ color: '#FFFFFF' }} />
-            )}
-            <span>{isLoading && activeProvider === 'facebook' ? 'Conectando con Facebook...' : 'Continuar con Facebook'}</span>
-          </button>
-
-          {/* GitHub OAuth */}
-          <button 
-            type="button" 
-            className="btn-secondary"
-            onClick={() => handleOAuthLogin('github')}
-            disabled={isLoading}
-            style={{ 
-              width: '100%', 
-              justifyContent: 'center', 
-              background: '#24292E', 
-              color: '#FFFFFF', 
-              borderColor: '#24292E',
-              fontWeight: 700,
-              padding: '0.75rem 1rem'
-            }}
-          >
-            {isLoading && activeProvider === 'github' ? (
-              <Loader2 size={18} className="animate-spin" style={{ color: '#FFFFFF' }} />
-            ) : (
-              <Github size={18} style={{ color: '#FFFFFF' }} />
-            )}
-            <span>{isLoading && activeProvider === 'github' ? 'Conectando con GitHub...' : 'Continuar con GitHub'}</span>
           </button>
         </div>
       </div>
