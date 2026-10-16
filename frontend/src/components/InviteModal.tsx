@@ -1,5 +1,13 @@
 'use client';
 
+/**
+ * Modal de gestión de invitaciones de asociados (#12).
+ * Genera links únicos de un solo uso con vencimiento (7 días), permite
+ * copiarlos y compartirlos (Web Share API / portapapeles), lista las
+ * invitaciones activas con su estado y ofrece revocarlas. Opera sobre el
+ * álbum del usuario autenticado (POST/GET/DELETE /api/album/invites).
+ */
+
 import React, { useCallback, useEffect, useState } from 'react';
 import { X, Users, Link2, Copy, Check, Loader2, Share2, AlertCircle, Plus, Clock } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';

@@ -1,5 +1,14 @@
 'use client';
 
+/**
+ * Panel de usuario (#15, #45): agrupa en tarjetas separadas el perfil,
+ * el idioma (ES/EN), el tema claro/oscuro (#43/#45), las preferencias de
+ * avisos de actividad (#34), la gestión de invitaciones y asociados (#12),
+ * el historial de invitaciones (#39), el acceso al panel de administración
+ * (#41) y la "Zona de peligro" con la autoeliminación de la cuenta (#54).
+ * El footer concentra el logout.
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   X, Mail, Globe, Users, Trash2, Copy, Check,

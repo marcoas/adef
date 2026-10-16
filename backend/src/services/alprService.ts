@@ -1,12 +1,16 @@
+/**
+ * Servicio de Reconocimiento de Patentes ALPR (Automatic License Plate Recognition).
+ *
+ * 1. Intenta consulta a Plate Recognizer API (IA especializada en patentes).
+ * 2. Si no hay Token o falla la conexión, realiza fallback automático a
+ *    Tesseract OCR Local.
+ *
+ * El texto devuelto se procesa con utils/plateExtractor para obtener el
+ * casillero (000-999) que corresponde a la patente leída.
+ */
 import { createWorker } from 'tesseract.js';
 import { extractPlate, PlateResult } from '../utils/plateExtractor';
 
-/**
- * Servicio de Reconocimiento de Patentes ALPR (Automatic License Plate Recognition)
- * 
- * 1. Intenta consulta a Plate Recognizer API (IA especializada en patentes).
- * 2. Si no hay Token o falla la conexión, realiza fallback automático a Tesseract OCR Local.
- */
 // Issue #48: callback opcional para registrar cada llamada real a una API
 // externa (Plate Recognizer). Vive en index.ts (donde está el PrismaClient)
 // y evita dependencia circular con la base de datos.

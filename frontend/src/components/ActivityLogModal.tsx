@@ -1,5 +1,12 @@
 'use client';
 
+/**
+ * Modal con el log histórico y cronológico de movimientos del álbum (#33).
+ * Pestañas "Todos / Pegadas / Despegadas", paginado incremental
+ * ("Cargar más") y detalle de quién pegó o despegó cada patente y cuándo.
+ * Opera sobre el álbum activo (propio o compartido).
+ */
+
 import React, { useCallback, useEffect, useState } from 'react';
 import { History, Loader2, Plus, Undo2, X, AlertCircle } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';

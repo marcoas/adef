@@ -1,5 +1,13 @@
 'use client';
 
+/**
+ * Página pública de aceptación de invitación (/invite/[token]) - Issue #12.
+ * Consulta el estado del link (título del álbum, dueño, válido / ya usado /
+ * vencido) y permite aceptar la invitación. Si el visitante no tiene
+ * sesión, abre el LoginModal y reintenta el aceptado tras el login
+ * exitoso, quedando asociado al álbum del invitante.
+ */
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Users, Loader2, AlertCircle, CheckCircle2, LogIn } from 'lucide-react';

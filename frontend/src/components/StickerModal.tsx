@@ -1,5 +1,13 @@
 'use client';
 
+/**
+ * Modal con el encabezado de la figurita (foto, patente, casillero, quién
+ * la pegó y cuándo) para un casillero ocupado (#6).
+ * Desde aquí el dueño del álbum puede despegarla (#10): abre un
+ * ConfirmDialog (#31) y ejecuta DELETE /api/album/stickers/:slot; el
+ * asociado de un álbum compartido solo puede ver el detalle.
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Calendar, User, CheckCircle2, Trash2 } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';

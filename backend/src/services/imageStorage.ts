@@ -1,3 +1,9 @@
+/**
+ * LEGADO (Issue #11): primer módulo de almacenamiento de imágenes en disco.
+ * Ya no está en uso: fue reemplazado por la fachada de proveedores de
+ * services/images (Issue #35, variantes local y Cloudinary). Se conserva
+ * como referencia histórica; no importarlo en código nuevo.
+ */
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';

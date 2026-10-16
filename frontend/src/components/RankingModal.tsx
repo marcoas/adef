@@ -1,5 +1,13 @@
 'use client';
 
+/**
+ * Modal con el ranking de pegatinas de un álbum compartido (#40).
+ * Consulta GET /api/albums/:id/ranking y lista a los miembros ordenados
+ * por cantidad de figuritas pegadas (medalla al primero, barra de
+ * proporción y tag de dueño). Si el álbum no es compartido informa que
+ * el ranking no está disponible.
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Trophy, Medal, Loader2 } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';

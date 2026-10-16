@@ -2,21 +2,75 @@
 
 ## 1. Visión General de la Arquitectura
 
-El sistema **Álbum de Patentes** está construido siguiendo el patrón de arquitectura desacoplada de Microservicios / API Restful + Frontend SPA/SSR.
+El sistema **Álbum de Patentes** sigue el patrón de arquitectura desacoplada **API REST + Frontend SPA/SSR**: el frontend nunca habla con la base de datos; todo pasa por la API del backend, que es la única capa con persistencia y acceso a servicios externos (OCR, almacenamiento de imágenes).
 
 ```
 [ Cliente Móvil / Desktop (Next.js) ]
-                │
-                ├── Requests HTTP / Rest API ──► [ Express Backend API ]
-                │                                       │
-                ├── Tesseract.js (Client OCR)          ├── Prisma ORM
-                │                                       │
-                └── Renderizado de Figuritas (000-999) └──► [ PostgreSQL DB ]
+        │
+        ├── Requests HTTP (JSON + JWT) ──► [ Express Backend API ]
+        │                                        │
+        │                                        ├── Prisma ORM ──────► [ PostgreSQL ]
+        │                                        │
+        │                                        ├── ALPR / Tesseract (OCR de patentes)
+        │                                        │
+        │                                        └── Image Provider ──► [ disco local | Cloudinary ]
+        │
+        └── Renderizado de la grilla 000-999 + miniaturas (#11)
 ```
+
+## 2. Estructura del Proyecto
+
+```
+adef/
+├── docker-compose.yml          # Orquestación: postgres + backend + frontend
+├── .env.example                # Variables de entorno (ver docs/DEVELOPMENT.md)
+├── README.md                   # Vista general y arranque rápido
+├── docs/
+│   ├── ARCHITECTURE.md         # Este documento
+│   ├── DATABASE_DER.md         # Modelo de datos (DER, enums, cascadas)
+│   ├── API.md                  # Referencia de endpoints
+│   └── DEVELOPMENT.md          # Guía de desarrollo
+├── backend/
+│   ├── src/
+│   │   ├── index.ts            # App Express: middlewares + todas las rutas
+│   │   ├── services/
+│   │   │   ├── alprService.ts  # OCR: Plate Recognizer + fallback Tesseract
+│   │   │   ├── images/         # Fachada de proveedores (#35): local/cloudinary
+│   │   │   └── imageStorage.ts # LEGADO (no usar)
+│   │   └── utils/
+│   │       └── plateExtractor.ts  # Regex de patente → casillero 000-999
+│   └── prisma/
+│       ├── schema.prisma       # Modelo de datos fuente de verdad
+│       └── migrations/         # Migraciones SQL versionadas
+└── frontend/
+    └── src/
+        ├── app/                # App Router: page.tsx, layout.tsx, invite/[token]
+        ├── components/         # Componentes React (ver §3)
+        ├── lib/                # i18n.ts (ES/EN), theme.ts
+        └── styles/             # globals.css (diseño + variables CSS)
+```
+
+## 3. Capas y Componentes
+
+### Backend (`backend/src/index.ts`)
+
+- **Middlewares:** `helmet` (headers de seguridad), `cors`, `express.json()` y servido estático de `/uploads`.
+- **Autenticación:** JWT (`jsonwebtoken`, 7 días). `requireAuth` valida el token, carga el usuario de la BD y bloquea cuentas `RESTRICTED` (#41); `requireAdmin` exige `isAdmin`.
+- **Rutas:** agrupadas por dominio (auth, álbum/figuritas, invitaciones, notificaciones, ranking, administración). La referencia completa está en [`API.md`](API.md).
+- **Dominio auxiliar:**
+  - `utils/plateExtractor.ts` — validación de formatos de patente y cálculo del casillero.
+  - `services/alprService.ts` — reconocimiento ALPR con fallback OCR (#48 registra el consumo).
+  - `services/images/` — fachada `storeImage` / `deleteStoredImages` con proveedores *local* y *cloudinary* (#35).
+
+### Frontend (Next.js App Router)
+
+- **`app/page.tsx`** — orquestador único de estado (sesión, álbum activo, álbumes, modales).
+- **Componentes principales:** `AlbumGrid` (grilla 000-999 con filtros y controles), `Header` (acciones + menú de usuario), `UploadModal` (captura/OCR), `StickerModal` (detalle/despegar), `UserModal` (panel de usuario #15/#45 y autoeliminación #54), `AdminPanel` (#41), `InviteModal` / `InvitePage` (#12), `NotificationsBell` (#34), `ActivityLogModal` (#33), `RankingModal` (#40), `ConfirmDialog` (#31), `QuickJumpBar` (#32).
+- **Cross-cutting:** `lib/i18n.ts` (ES/EN, todas las cadenas visibles pasan por `getTranslation`), `lib/theme.ts` (tema claro/oscuro persistente #36/#43).
 
 ---
 
-## 2. Lógica de Extracción de Patentes
+## 4. Lógica de Extracción de Patentes
 
 El sistema reconoce dos tipos de patentes estándar:
 
@@ -32,11 +86,61 @@ El sistema reconoce dos tipos de patentes estándar:
 Independientemente del modelo de patente, la extracción obtiene la secuencia exacta de **3 dígitos numéricos**.
 El número entero resultante (ej: `042` ➔ `42`) corresponde al casillero único del álbum (rango `000` al `999`).
 
----
+## 5. Flujo Principal: Pegado de una Figurita
 
-## 3. Despliegue con Infraestructura de Costo Cero ($0 USD)
+```
+[UploadModal]                     [Backend]                          [BD / Almacenamiento]
+     │  1. foto (cámara/archivo)      │                                        │
+     │──────────────────────────────►│  POST /api/plates/ocr                  │
+     │                               │  (ALPR → fallback Tesseract)          │
+     │                               │  + registro en external_api_calls #48 │
+     │  2. patente + casillero       │                                        │
+     │◄──────────────────────────────│                                        │
+     │  3. usuario confirma          │                                        │
+     │  POST /api/album/stickers     │                                        │
+     │──────────────────────────────►│  extractPlate() → slot 000-999         │
+     │                               │  valida imagen (tipo/tamaño) #10       │
+     │                               │  chequea unicidad (409 si ocupado)     │
+     │                               │  storeImage() ───────────────────────►│ disco/Cloudinary
+     │                               │  INSERT stickers + activity #33       │
+     │                               │  + notification al dueño #34          │
+     │  4. grilla se actualiza       │◄──────────────────────────────────────│
+```
+
+Detalles: la casilla solo se llena si está vacía (carácter lúdico, sin validación anti-fraude #8); la imagen viaja como data URL o URL http(s), y el backend responde `422` si la patente no es válida, `415`/`413` si el formato o tamaño de la imagen no corresponde.
+
+## 6. Almacenamiento de Imágenes (#11 / #35)
+
+La fachada `backend/src/services/images/index.ts` expone `storeImage()` / `deleteStoredImages()` y resuelve el proveedor según `IMAGE_PROVIDER`:
+
+- **`local`** (default) — archivos en `backend/src/uploads/` con nombre aleatorio (URL inmutable) y miniatura WebP 320 px; Express los sirve en `/uploads`.
+- **`cloudinary`** — nube gratuita; requiere credenciales en `.env`.
+- El **borrado se propaga a todos los proveedores** (cada uno ignora URLs ajenas), permitiendo convivencia de fotos locales y de la nube.
+
+La BD solo guarda URLs: la grilla usa `thumbnail_url` (#11) y el detalle la imagen original.
+
+## 7. Colaboración: Álbumes Compartidos
+
+- **Invitación (#12):** link con token de un solo uso y vencimiento de 7 días (`GET /invite/[token]` en el frontend). Al aceptar se crea `album_members` con rol `ASSOCIATE`.
+- **Permisos:** dueño y asociados comparten permisos de captura; el dueño administra miembros (revocar #37) e invitaciones (revocar, log #39).
+- **Log histórico (#33):** cada pegado/despegado inserta una fila en `sticker_activities` con snapshot del nombre (sobrevive a bajas de cuenta).
+- **Notificaciones (#34):** avisos al dueño por figurita pegada, asociado sumado/desvinculado y acceso revocado; el frontend las muestra en la campana y permite marcar leídas.
+- **Ranking (#40):** conteo de figuritas por miembro en álbumes compartidos.
+
+## 8. Seguridad y Administración
+
+- **Sesión:** JWT firmado (`JWT_SECRET`); el token y la sesión de usuario viven en `localStorage` del navegador.
+- **Entradas:** validación de patente, tipo/MIME y tamaño de imagen (#10), y autorización por recurso (cada usuario solo opera sobre álbumes a los que accede #8).
+- **Administración (#41):** panel privado (`AdminPanel`) con dashboard, gestión de usuarios (restringir/reactivar, rol admin) y consumo de APIs externas (#48). Los admins se siembran idempotentemente con `ADMIN_EMAILS`; `RESTRICTED` bloquea login y rutas.
+- **Autoeliminación (#54):** `DELETE /api/users/me` elimina la cuenta de forma irreversible con cascada en BD y borrado de imágenes (ver [DATABASE_DER.md](DATABASE_DER.md) §onDelete y `deleteAccountCascade()`).
+
+## 9. Despliegue con Infraestructura de Costo Cero ($0 USD)
 
 - **Frontend:** Alojado en **Vercel** o **Netlify** con CI/CD automático desde el repositorio de GitHub.
 - **Backend API:** Alojado en **Render** (Web Service gratuito) o **Railway**.
 - **Base de Datos:** Instancia PostgreSQL alojada en **Supabase Free Tier** o **Neon.tech**.
 - **Almacenamiento de Imágenes:** Capa gratuita de **Cloudinary** (hasta 25 GB de almacenamiento y ancho de banda mensual).
+
+---
+
+> **Relacionado:** [Base de datos (DER)](DATABASE_DER.md) · [Referencia de la API](API.md) · [Guía de desarrollo](DEVELOPMENT.md) · [README](../README.md)

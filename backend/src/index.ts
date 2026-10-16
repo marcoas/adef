@@ -1,3 +1,23 @@
+/**
+ * Punto de entrada y API REST del backend (Express + TypeScript + Prisma).
+ *
+ * Contenido principal:
+ *   - Middlewares de seguridad (helmet, cors) y autenticación JWT
+ *     (`requireAuth`) más el guard de administración (`requireAdmin`) #41.
+ *   - Rutas de autenticación (/api/auth/*) y de cuenta (/api/users/me):
+ *     preferencias de avisos #34 y autoeliminación irreversible #54.
+ *   - Rutas de álbum y figuritas (/api/album*): carga, borrado #31,
+ *     log de movimientos #33, invitaciones #12, miembros #37,
+ *     notificaciones #34 y ranking #40.
+ *   - Rutas de administración (/api/admin/*): dashboard, gestión de
+ *     usuarios #41 y consumo de APIs externas #48.
+ *   - Procesamiento de patentes: OCR con Tesseract.js y ALPR (Plate
+ *     Recognizer) - ver services/alprService.ts y utils/plateExtractor.ts.
+ *
+ * La persistencia usa Prisma ORM sobre PostgreSQL (backend/prisma/schema).
+ * El almacenamiento de imágenes se abstrae en services/images (local /
+ * Cloudinary). Documentación completa en README.md y docs/.
+ */
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';

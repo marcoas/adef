@@ -1,5 +1,14 @@
 'use client';
 
+/**
+ * Popup de confirmación reutilizable con la estética del sitio (#31).
+ * Reemplaza a window.confirm()/alert(): título, mensaje con fragmento
+ * destacado en monoespaciada, pista, estado de procesamiento (spinner),
+ * error inline y botones Cancelar / Eliminar con foco inicial en Cancelar
+ * y cierre con Escape. Se usa para despegar figuritas (#31) y para la
+ * autoeliminación de cuenta (#54).
+ */
+
 import React, { useEffect, useRef } from 'react';
 import { AlertTriangle, Loader2, Trash2, X } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';

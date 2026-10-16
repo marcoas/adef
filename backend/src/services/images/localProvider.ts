@@ -1,3 +1,11 @@
+/**
+ * Proveedor de almacenamiento de imágenes "local" (Issue #11).
+ *
+ * Guarda las fotos en backend/src/uploads/ con nombre aleatorio (URL
+ * inmutable y cacheable) y genera miniaturas WebP de 320px con `sharp`.
+ * Express las sirve estáticamente bajo /uploads. Implementa la interfaz
+ * `ImageProvider` definida en ./types; el selector de proveedor está en ./index.
+ */
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';

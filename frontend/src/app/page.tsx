@@ -1,5 +1,21 @@
 'use client';
 
+/**
+ * Página principal (HomePage): orquesta el estado global de la aplicación.
+ *
+ * Responsabilidades:
+ *   - Sesión de usuario: restauración desde localStorage, refresh de datos
+ *     de cuenta #41 y login/logout.
+ *   - Carga del álbum activo y de la lista de álbumes propios/compartidos #12,
+ *     con manejo de sesión expirada (401) y de acceso revocado (403 #37).
+ *   - Render de Header, AlbumGrid y de todos los modales: captura/OCR #53,
+ *     detalle de casillero, login #6, invitaciones #12, panel de usuario #15,
+ *     administración #41 y log de movimientos #33.
+ *   - Manejadores compartidos: pegar/despegar figuritas, cambio de álbum,
+ *     apertura de casilleros, notificaciones y scroll al casillero
+ *     detectado por OCR #53.
+ */
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Header } from '../components/Header';

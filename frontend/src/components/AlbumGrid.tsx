@@ -1,5 +1,17 @@
 'use client';
 
+/**
+ * Rejilla principal de 1000 casilleros (000-999) del álbum (#16).
+ *
+ * Controles sticky:
+ *   - Buscador de casillero #14 y salto rápido por grupos #32 (QuickJumpBar).
+ *   - Filtro unificado pegadas / faltantes #13 con indicador de progreso.
+ *   - Selector de álbum propio o compartido #12 (OWNER / ASSOCIATE).
+ *   - Acceso al ranking de pegatinas #40 (RankingModal).
+ * Cada casillero muestra la miniatura de la figurita pegada (#11) o su
+ * estado faltante / bloqueado; el click abre el detalle o la captura.
+ */
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, Sparkles, Lock, BookOpen, ArrowUp, ArrowLeftRight, CheckCircle2, CircleDashed, X, Trophy, LogOut } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';

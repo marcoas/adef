@@ -1,5 +1,13 @@
 'use client';
 
+/**
+ * Modal de inicio de sesión (#6).
+ * Ofrece los métodos habilitados por el backend (OAuth Google / Facebook /
+ * GitHub o email), maneja carga y errores, y al autenticar con éxito
+ * persiste `jwt_token` y `user_session` en localStorage antes de notificar
+ * al padre vía onLoginSuccess.
+ */
+
 import React, { useState, useEffect } from 'react';
 import { X, LogIn, ShieldCheck, AlertCircle, Loader2, Github, Facebook } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';

@@ -53,7 +53,44 @@ Webapp lúdica y familiar (responsive mobile y desktop) inspirada en el concepto
 
 ---
 
+## 📂 Estructura del Proyecto
+
+```
+adef/
+├── docker-compose.yml      # Orquestación: postgres + backend + frontend
+├── .env.example            # Variables de entorno documentadas
+├── docs/                   # Documentación del sistema (ver abajo)
+├── backend/                # API REST (Express + TypeScript + Prisma)
+│   ├── src/index.ts        #   Rutas y middlewares
+│   ├── src/services/       #   OCR/ALPR y almacenamiento de imágenes
+│   └── prisma/             #   Schema y migraciones (PostgreSQL)
+└── frontend/               # App Next.js (App Router)
+    ├── src/app/            #   Páginas (principal, /invite/[token])
+    ├── src/components/     #   Componentes React (grilla, modales, paneles)
+    └── src/lib/            #   i18n (ES/EN) y manejo de tema
+```
+
+---
+
+## 🧑‍💻 Comandos de Desarrollo
+
+```bash
+# Compilar / validar sin ejecutar
+cd backend  && npx prisma generate && npx tsc --noEmit
+cd frontend && npx tsc --noEmit
+
+# Backend en caliente (sin Docker): npm run dev
+# Frontend en caliente (sin Docker): npm run dev
+# Nueva migración BD:                npm run prisma:migrate  (en backend/)
+```
+
+Guía completa de entorno, scripts, migraciones y convenciones: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.
+
+---
+
 ## 📄 Documentación Adicional
 
-- [Diagrama de Entidad Relación (DER)](docs/DATABASE_DER.md)
-- [Arquitectura del Sistema y Flujo OCR](docs/ARCHITECTURE.md)
+- [Arquitectura del Sistema, estructura y flujos](docs/ARCHITECTURE.md)
+- [Diagrama de Entidad Relación (DER) y reglas de cascada](docs/DATABASE_DER.md)
+- [Referencia de la API REST (endpoints)](docs/API.md)
+- [Guía de Desarrollo (setup, scripts, convenciones)](docs/DEVELOPMENT.md)

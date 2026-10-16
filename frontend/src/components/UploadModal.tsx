@@ -1,5 +1,14 @@
 'use client';
 
+/**
+ * Modal de captura y pegado de figuritas (#10, #53).
+ * Acepta foto de cámara o archivo, valida tipo/tamaño, reconoce la patente
+ * con ALPR/OCR (POST /api/plates/ocr) sugiriendo el casillero, permite
+ * corregirlo manualmente y confirma el pegado (POST /api/album/stickers)
+ * en el álbum activo. Durante el OCR informa el casillero detectado al
+ * padre (onPlateDetected) para que el álbum haga scroll hasta él (#53).
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Upload, CheckCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';

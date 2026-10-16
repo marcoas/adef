@@ -1,5 +1,12 @@
 'use client';
 
+/**
+ * Barra flotante de salto rápido (#32).
+ * Muestra accesos numéricos a los grupos de casilleros del álbum y emite
+ * onJump(group) para que AlbumGrid despliegue y scrollee hasta ese tramo
+ * de la grilla.
+ */
+
 import React, { useState } from 'react';
 import { ListOrdered } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';

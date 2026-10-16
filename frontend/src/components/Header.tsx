@@ -1,5 +1,14 @@
 'use client';
 
+/**
+ * Cabecera principal de la aplicación (#15).
+ * Acciones de "Pegar figurita" e "Invitar asociado", selector de idioma
+ * ES/EN, campana de notificaciones #34 (NotificationsBell) y menú de
+ * usuario desplegable con acceso al panel de usuario, al panel de
+ * administración #41 y al logout. Aplica el tema claro/oscuro #36/#43
+ * al montar.
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Users, Car, Globe, LogIn, UserCheck, LogOut, ChevronDown, User, ShieldCheck } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';

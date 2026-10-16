@@ -1,4 +1,10 @@
 import type { Metadata } from 'next';
+/**
+ * Layout raíz de la app Next.js (App Router).
+ * Importa los estilos globales, define los metadatos SEO (título,
+ * descripción, keywords y favicon de chapa patente #47) y envuelve todas
+ * las páginas con <html>/<body>.
+ */
 import '../styles/globals.css';
 
 export const metadata: Metadata = {

@@ -1,5 +1,13 @@
 'use client';
 
+/**
+ * Campana de notificaciones de actividad del álbum (#34).
+ * Consulta /api/notifications, muestra el contador de no leídas, despliega
+ * el listado de avisos (figurita pegada, asociado sumado / desvinculado,
+ * acceso revocado #37), permite marcar como leídas y, al seleccionar un
+ * aviso, emite onSelectNotification para que la página abra la figurita.
+ */
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Bell, BellRing, CheckCheck, History, Sparkles, Users, X } from 'lucide-react';
 import { getTranslation, Locale } from '../lib/i18n';
