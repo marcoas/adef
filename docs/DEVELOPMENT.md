@@ -114,6 +114,11 @@ npm run prisma:generate       # refresca los tipos del cliente
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Arquitectura, estructura y flujos. |
 | [DATABASE_DER.md](DATABASE_DER.md) | Modelo de datos completo. |
 | [API.md](API.md) | Todos los endpoints. |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Hosting con costo 0 y capacidad medida. |
 | Este archivo | Entorno, scripts y convenciones. |
+
+**Regla:** todo cambio (endpoints, arquitectura, dependencias, variables de
+entorno, esquema de BD, despliegue) actualiza en el **mismo commit** la
+documentación afectada de esta tabla y `.env.example`.
 
 ---

@@ -21,8 +21,8 @@ Webapp lúdica y familiar (responsive mobile y desktop) inspirada en el concepto
 
 | Capa | Tecnología | Plataforma Hosting / Producción (Costo 0) |
 |---|---|---|
-| **Frontend** | React / Next.js, CSS Modules, Lucide Icons, i18next | Vercel / Netlify |
-| **Backend** | Node.js, Express, TypeScript, Prisma ORM, Tesseract OCR | Render / Railway (Free) |
+| **Frontend** | React / Next.js, CSS Modules, Lucide Icons, i18next | Vercel |
+| **Backend** | Node.js, Express, TypeScript, Prisma ORM, Plate Recognizer API (OCR) | Render (Free) / Oracle Cloud Always Free |
 | **Base de Datos** | PostgreSQL 16 | Supabase / Neon (Free Tier) |
 | **Imágenes** | Cloudinary (Free Tier) / Local Provider | Cloudinary |
 | **Orquestación** | Docker & Docker Compose | Containerized local dev |
@@ -97,3 +97,4 @@ Guía completa de entorno, scripts, migraciones y convenciones: **[docs/DEVELOPM
 - [Diagrama de Entidad Relación (DER) y reglas de cascada](docs/DATABASE_DER.md)
 - [Referencia de la API REST (endpoints)](docs/API.md)
 - [Guía de Desarrollo (setup, scripts, convenciones)](docs/DEVELOPMENT.md)
+- [Despliegue: opciones de hosting y capacidad](docs/DEPLOYMENT.md)

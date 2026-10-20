@@ -3,7 +3,7 @@
  *
  * - `generalLimiter`: tope amplio para toda la API (frena DoS básico).
  * - `strictLimiter`: tope bajo para rutas sensibles o costosas (login y OCR,
- *   que consume cuota de la API externa / CPU de Tesseract).
+ *   que consume cuota de la API externa).
  *
  * Nota: si el backend se despliega detrás de un proxy (Render, Nginx...),
  * configurar `app.set('trust proxy', 1)` para que `req.ip` sea la IP real.

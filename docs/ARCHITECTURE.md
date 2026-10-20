@@ -11,7 +11,7 @@ El sistema **Álbum de Patentes** sigue el patrón de arquitectura desacoplada *
         │                                        │
         │                                        ├── Prisma ORM ──────► [ PostgreSQL ]
         │                                        │
-        │                                        ├── ALPR / Tesseract (OCR de patentes)
+        │                                        ├── Plate Recognizer API (OCR de patentes)
         │                                        │
         │                                        └── Image Provider ──► [ disco local | Cloudinary ]
         │
@@ -46,7 +46,7 @@ adef/
 │   │   │   ├── notificationService.ts # Avisos al dueño del álbum (#34)
 │   │   │   ├── accountService.ts      # Baja de cuenta en cascada (#41/#54)
 │   │   │   ├── externalApiUsage.ts    # Registro de llamadas a APIs externas (#48)
-│   │   │   ├── alprService.ts  # OCR: Plate Recognizer + fallback Tesseract
+│   │   │   ├── alprService.ts  # OCR: Plate Recognizer API
 │   │   │   └── images/         # Fachada de proveedores (#35): local/cloudinary
 │   │   └── utils/
 │   │       └── plateExtractor.ts  # Regex de patente → casillero 000-999
@@ -110,7 +110,7 @@ El número entero resultante (ej: `042` ➔ `42`) corresponde al casillero únic
 [UploadModal]                     [Backend]                          [BD / Almacenamiento]
      │  1. foto (cámara/archivo)      │                                        │
      │──────────────────────────────►│  POST /api/plates/ocr                  │
-     │                               │  (ALPR → fallback Tesseract)          │
+     │                               │  (ALPR vía Plate Recognizer)          │
      │                               │  + registro en external_api_calls #48 │
      │  2. patente + casillero       │                                        │
      │◄──────────────────────────────│                                        │

@@ -21,8 +21,7 @@
     "express-rate-limit": "^7.5.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "sharp": "^0.33.4",
-    "tesseract.js": "^5.0.4"
+    "sharp": "^0.33.4"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
