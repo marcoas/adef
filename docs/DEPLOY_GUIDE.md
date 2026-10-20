@@ -4,21 +4,25 @@ Cómo publicar el Álbum de Patentes con **costo 0**. El análisis de opciones,
 límites y capacidad está en [DEPLOYMENT.md](DEPLOYMENT.md); este documento es
 el *cómo*.
 
-- **Opción A (recomendada):** Render (backend) + Vercel (frontend) + Neon
-  (PostgreSQL) + Cloudinary (fotos). Sin tarjeta, sin mantenimiento.
-- **Opción B:** una VM de Oracle Cloud Always Free con Docker Compose y Caddy
-  (HTTPS). Más capacidad y no se duerme, pero el mantenimiento es propio.
-  Ver [sección 10](#10-alternativa-oracle-cloud-always-free).
+- **Opción A (recomendada): Oracle Cloud Always Free.** Una VM con Docker
+  Compose y Caddy (HTTPS). No se duerme, aguanta cientos de usuarios y
+  **permite publicidad**. El mantenimiento del servidor es propio. Ver
+  [sección 10](#10-opción-a-recomendada-oracle-cloud-always-free); necesita
+  los pasos 3 a 5 (Cloudinary, Plate Recognizer, Google).
+- **Opción B: Render (backend) + Vercel (frontend) + Neon (PostgreSQL) +
+  Cloudinary.** Sin tarjeta y sin mantenimiento, pero el backend se duerme, la
+  capacidad es chica y **Vercel Hobby prohíbe el uso comercial, incluida la
+  publicidad**. Pasos 2 a 9.
 
 Archivos de despliegue del repositorio:
 
 | Archivo | Uso |
 |---|---|
-| [`render.yaml`](../render.yaml) | Blueprint de Render para el backend. |
-| [`frontend/vercel.json`](../frontend/vercel.json) | Vercel: framework y *Ignored Build Step* (solo despliega si cambia `frontend/`). |
+| [`docker-compose.prod.yml`](../docker-compose.prod.yml) + [`Caddyfile`](../Caddyfile) | Opción A (una sola VM en Oracle). |
+| [`render.yaml`](../render.yaml) | Opción B: Blueprint de Render para el backend. |
+| [`frontend/vercel.json`](../frontend/vercel.json) | Opción B, Vercel: framework y *Ignored Build Step* (solo despliega si cambia `frontend/`). |
 | [`backend/Dockerfile`](../backend/Dockerfile) | Multi-stage: `dev`, `build`, `migrate`, `production`. |
 | [`frontend/Dockerfile`](../frontend/Dockerfile) | Multi-stage: `dev`, `build`, `production`. |
-| [`docker-compose.prod.yml`](../docker-compose.prod.yml) + [`Caddyfile`](../Caddyfile) | Opción B (una sola VM). |
 
 ---
 
@@ -27,7 +31,9 @@ Archivos de despliegue del repositorio:
 - El código tiene que estar en GitHub (Render y Vercel despliegan desde ahí,
   en cada push a `main`).
 - Tener a mano un gestor de contraseñas: vas a juntar unos 8 secretos.
-- Orden de despliegue (cada paso necesita datos del anterior):
+- **Opción A (Oracle):** pasos 3, 4 y 5 (credenciales) y después la
+  [sección 10](#10-opción-a-recomendada-oracle-cloud-always-free).
+- **Opción B**, orden de despliegue (cada paso necesita datos del anterior):
   1. Cuentas y credenciales: **Neon**, **Cloudinary**, **Plate Recognizer**
      y el **client id de Google** (pasos 2 a 5, en cualquier orden).
   2. **Render** (backend): necesita todo lo anterior → da la URL de la API.
@@ -37,7 +43,7 @@ Archivos de despliegue del repositorio:
 
 ---
 
-## 2. Neon (PostgreSQL)
+## 2. Neon (PostgreSQL) — opción B
 
 1. Crear cuenta en <https://neon.com> (plan **Free**, sin tarjeta).
 2. *Create project*: nombre `album-patentes`, Postgres 16, región
@@ -101,7 +107,7 @@ hacen falta **Authorized JavaScript origins**; no se usan *redirect URIs*.
      cargados. Para abrirlo a todos: *Publish app* → **In production**.
 3. *Credentials → Create credentials → OAuth client ID → Web application*.
    - *Authorized JavaScript origins*: por ahora `http://localhost:3000`.
-     La URL de Vercel se agrega en el [paso 8](#8-cerrar-el-circuito-google-y-cors)
+     La URL de Vercel se agrega en el [paso 8](#8-cerrar-el-circuito-google-y-cors--opción-b)
      (todavía no existe).
    - *Authorized redirect URIs*: vacío.
 4. Copiar el **Client ID** (`xxxx.apps.googleusercontent.com`). Se usa en
@@ -111,7 +117,7 @@ hacen falta **Authorized JavaScript origins**; no se usan *redirect URIs*.
 
 ---
 
-## 6. Render (backend)
+## 6. Render (backend) — opción B
 
 ### 6.1 Cómo está configurado (`render.yaml`)
 
@@ -175,7 +181,7 @@ curl https://album-patentes-api.onrender.com/api/health
 
 ---
 
-## 7. Vercel (frontend)
+## 7. Vercel (frontend) — opción B
 
 1. Crear cuenta en <https://vercel.com> (plan **Hobby**: solo uso no
    comercial) con GitHub.
@@ -207,7 +213,7 @@ build se hace igual. Para forzar un build: *Redeploy* desde el panel.
 
 ---
 
-## 8. Cerrar el circuito (Google y CORS)
+## 8. Cerrar el circuito (Google y CORS) — opción B
 
 1. **Google Cloud Console → Credentials → el OAuth client → Authorized
    JavaScript origins**: agregar el dominio de producción de Vercel, sin `/`
@@ -228,7 +234,7 @@ build se hace igual. Para forzar un build: *Redeploy* desde el panel.
 
 ---
 
-## 9. Verificación post-deploy
+## 9. Verificación post-deploy — opción B
 
 1. `curl https://<backend>/api/health` → `200` con `"database":"connected (PostgreSQL)"`.
    La primera llamada tras un rato puede tardar 30–60 s (Render despierta).
@@ -251,7 +257,7 @@ Render las aplica en el build.
 
 ---
 
-## 10. Alternativa: Oracle Cloud Always Free
+## 10. Opción A (recomendada): Oracle Cloud Always Free
 
 Todo en una VM: Caddy (HTTPS automático) → frontend Next.js y backend Express;
 PostgreSQL en la misma red interna de Docker, sin puertos expuestos.
@@ -263,18 +269,66 @@ Internet ─► :443 Caddy ─┬─ /api/*, /uploads/* ─► backend:4000 ─�
                         └─ resto ──────────────► frontend:3000
 ```
 
-### 10.1 Crear la VM
+Credenciales previas: Cloudinary (paso 3), Plate Recognizer (paso 4) y el
+client id de Google (paso 5). **Neon no hace falta**: la base corre en la VM.
 
-1. Cuenta en <https://cloud.oracle.com> (pide tarjeta para verificar; pasar a
-   **Pay As You Go** evita que Oracle reclame VMs ociosas y sigue sin costo si
-   no se sale de los recursos Always Free).
-2. *Compute → Instances → Create*: imagen **Ubuntu 24.04**, forma
-   **VM.Standard.A1.Flex** (ARM64), 2 OCPU / 12 GB. Si da *Out of capacity*,
-   reintentar más tarde u otro *availability domain*.
-3. Cargar tu clave SSH pública. Anotar la IP pública.
-4. *Networking → VCN → Security List* de la subred: agregar reglas de
-   entrada TCP **80** y **443** desde `0.0.0.0/0` (y UDP 443 para HTTP/3).
-5. En la VM, el firewall de Ubuntu en Oracle bloquea todo salvo SSH:
+### 10.0 Condiciones de Oracle (revisadas el 2026-10-20)
+
+| Tema | Condición |
+|---|---|
+| Recursos gratis | VM ARM **A1.Flex: 2 OCPU / 12 GB** (1.500 OCPU-hora y 9.000 GB-hora por mes), 200 GB de disco en total, 5 backups de volumen, **10 TB/mes** de tráfico saliente. |
+| Región | Los recursos Always Free solo son gratis en la **región de origen** (*home region*), que se elige al registrarse y **no se puede cambiar**. |
+| VM ociosa | En cuentas gratuitas, Oracle puede **reclamar** la VM si durante 7 días la CPU (percentil 95), la red y la memoria quedan por debajo del 20%. Una app con poco tráfico cumple ese criterio. |
+| Pay As You Go | Pasar la cuenta a PAYG evita el reclamo por inactividad y **sigue sin costo** mientras se use solo lo Always Free. Cualquier recurso que no sea Always Free se cobra. |
+| Uso comercial | No se encontró una restricción para Always Free (sí la tiene la *Cloud Trial Agreement* de las pruebas pagas, que es otro documento). Oracle no da SLA. |
+| Capacidad | El cupo A1 es compartido por región: crear la VM puede fallar con *Out of capacity* durante días. |
+| Cambios | Oracle redujo el cupo A1 a la mitad en 2026 sin anuncio público: puede volver a cambiar. |
+
+### 10.1 Crear la cuenta
+
+1. Registrarse en <https://signup.cloud.oracle.com>. Pide tarjeta para
+   verificar identidad (puede hacer una retención temporal que luego libera).
+2. **Elegir bien la *home region***: no se cambia después. Preferir una cercana
+   a los usuarios (p. ej. *Brazil East (Sao Paulo)*, *Chile Central (Santiago)*);
+   si la creación de la VM falla por capacidad durante días, no hay forma de
+   mudarse de región sin crear otra cuenta.
+3. Al terminar, la cuenta tiene 30 días de prueba con crédito. **Crear solo
+   recursos marcados *Always Free-eligible***: lo que no lo sea se borra (o se
+   cobra) al terminar la prueba.
+4. **Pasar a Pay As You Go** (*Billing & Cost Management → Upgrade and
+   Manage Payment*), para evitar el reclamo por inactividad.
+5. **Crear un presupuesto con alerta** (*Billing & Cost Management → Budgets →
+   Create Budget*): monto `1` USD, alerta al 1% por correo. Si algo empieza a
+   cobrarse, te enterás enseguida.
+
+### 10.2 Crear la VM
+
+1. *Compute → Instances → Create instance*.
+2. **Image:** *Canonical Ubuntu 24.04* (variante **aarch64**, la que ofrece al
+   elegir la forma ARM).
+3. **Shape:** *Ampere → VM.Standard.A1.Flex*, **2 OCPU / 12 GB** (no más: lo
+   que exceda se cobra en PAYG).
+   - Si da *Out of capacity*: probar otro *Availability domain* o reintentar
+     en otro horario (a veces lleva días).
+4. **Networking:** dejar que cree la VCN y la subred pública, con *Assign a
+   public IPv4 address* activado.
+5. **SSH keys:** subir tu clave pública (`~/.ssh/id_ed25519.pub`; si no
+   tenés, `ssh-keygen -t ed25519`).
+6. **Boot volume:** 50 GB (el mínimo; entra en los 200 GB gratis).
+7. *Create*. Anotar la **IP pública**. La IP efímera se mantiene aunque se
+   detenga y reinicie la VM; se pierde solo si se **termina**.
+8. Probar el acceso: `ssh ubuntu@IP_PUBLICA`.
+
+### 10.3 Abrir los puertos 80 y 443
+
+Hay **dos** firewalls y hay que abrir ambos:
+
+1. **Oracle (Security List):** *Networking → Virtual Cloud Networks → la VCN
+   → Security Lists → Default Security List → Add Ingress Rules*:
+   - Source CIDR `0.0.0.0/0`, TCP, *Destination port* `80`.
+   - Source CIDR `0.0.0.0/0`, TCP, *Destination port* `443`.
+   - (opcional) Source CIDR `0.0.0.0/0`, UDP, `443` (HTTP/3).
+2. **Ubuntu (iptables):** la imagen de Oracle bloquea todo salvo SSH. En la VM:
 
 ```bash
 sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
@@ -283,26 +337,47 @@ sudo iptables -I INPUT 6 -m state --state NEW -p udp --dport 443 -j ACCEPT
 sudo netfilter-persistent save
 ```
 
-### 10.2 Dominio
+### 10.4 Dominio
 
-Apuntar un registro **A** del dominio (p. ej. `album.midominio.com`) a la IP
-pública. Sin dominio propio sirve `IP-CON-GUIONES.sslip.io` (p. ej.
-`130-61-10-20.sslip.io`): resuelve a esa IP y Let's Encrypt emite el
-certificado. Google OAuth exige un dominio (no acepta IPs como origen).
+- **Con dominio propio** (recomendado): crear un registro **A**
+  (p. ej. `album.midominio.com`) que apunte a la IP pública.
+- **Sin dominio:** `IP-CON-GUIONES.sslip.io` (p. ej. `130-61-10-20.sslip.io`)
+  resuelve a esa IP y Let's Encrypt emite el certificado.
+  - Google exige un dominio para el login (no acepta IPs). Verificar que
+    acepte el origen `sslip.io`; si lo rechaza, hace falta un dominio.
+  - **Para publicidad** (p. ej. AdSense) hace falta un **dominio propio**: las
+    redes de anuncios verifican la propiedad del dominio. Es probablemente el
+    único costo del proyecto.
 
-### 10.3 Instalar y configurar
+Verificar desde tu máquina: `dig +short album.midominio.com` debe devolver la
+IP pública antes de levantar Caddy.
+
+### 10.5 Preparar el servidor
 
 ```bash
+# Actualizaciones del sistema y parches de seguridad automáticos
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y unattended-upgrades git
+sudo dpkg-reconfigure -plow unattended-upgrades
+
 # Docker Engine + plugin compose (soporta ARM64)
 curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker $USER && newgrp docker
+docker run --rm hello-world
+```
 
-git clone https://github.com/<usuario>/<repo>.git album && cd album
+### 10.6 Clonar y configurar
+
+El repositorio es público, así que se clona sin credenciales:
+
+```bash
+git clone https://github.com/marcoas/adef.git album && cd album
 cp .env.example .env
+chmod 600 .env
 nano .env
 ```
 
-Valores del `.env` para producción (las demás se pueden dejar como están):
+Valores del `.env` para producción (el resto se puede dejar como está):
 
 | Variable | Valor |
 |---|---|
@@ -314,64 +389,83 @@ Valores del `.env` para producción (las demás se pueden dejar como están):
 | `PLATE_RECOGNIZER_TOKEN` | Paso 4. |
 | `PLATE_RECOGNIZER_MONTHLY_QUOTA` | `2500`. |
 | `ADMIN_EMAILS` | Tu correo. |
-| `IMAGE_PROVIDER` | `cloudinary` (recomendado, ver nota) o `local` (fotos en el volumen `uploads`). |
+| `IMAGE_PROVIDER` | `cloudinary` (recomendado: no ocupa el disco de la VM ni entra en sus backups) o `local` (fotos en el volumen `uploads`). |
 | `CLOUDINARY_*` | Si `IMAGE_PROVIDER=cloudinary`. |
+| `TRUST_PROXY` | Vacío (vale `1`: Caddy es el único proxy delante). |
 
-`docker-compose.prod.yml` arma solo lo demás: `DATABASE_URL` (apunta al
-servicio `postgres`), `FRONTEND_URL=https://${DOMAIN}`,
+`docker-compose.prod.yml` arma solo lo demás: `NODE_ENV=production`,
+`DATABASE_URL` (apunta al servicio `postgres`), `FRONTEND_URL=https://${DOMAIN}`,
 `NEXT_PUBLIC_API_URL=https://${DOMAIN}/api` y
 `NEXT_PUBLIC_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}`. Si falta una variable
 obligatoria, `docker compose` se niega a arrancar y dice cuál.
 
-> **Nota sobre `IMAGE_PROVIDER=local` detrás de Caddy:** hasta que el backend
-> configure `app.set('trust proxy', 1)` (mejora 1 de
-> [DEPLOYMENT.md](DEPLOYMENT.md)), arma las URLs de las fotos con `http://` y
-> el rate limit ve a todos los usuarios con la IP de Caddy. Con Cloudinary las
-> URLs son siempre `https://`.
+Con `TRUST_PROXY=1` el backend toma la IP real del usuario y el protocolo
+`https` de los encabezados de Caddy, así que el rate limit es por usuario y
+las URLs de las fotos locales salen con `https://`.
 
-### 10.4 Levantar
+### 10.7 Levantar
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml logs -f caddy backend
 ```
 
 Qué pasa en cada `up`:
 
 1. Se construyen las imágenes **nativas ARM64** (target `production` del
    backend y del frontend; el primer build tarda varios minutos).
+   > Las imágenes no se probaron todavía en ARM64 (solo en x86). Si el build
+   > falla, revisar el error de `sharp` o del motor de Prisma.
 2. `postgres` arranca y espera a estar sano.
 3. `migrate` (target `migrate` del backend) corre `prisma migrate deploy` y
    **termina**: es el paso de pre-deploy.
 4. `backend` arranca **solo si la migración terminó bien**. Si el contenedor
    se reinicia, no vuelve a migrar.
 5. Caddy obtiene el certificado de Let's Encrypt (requiere que el DNS ya
-   apunte a la VM y los puertos 80/443 estén abiertos).
+   apunte a la VM y los puertos 80/443 estén abiertos en los dos firewalls).
 
-### 10.5 Google, verificación y operación
+Todos los servicios tienen `restart: unless-stopped`: vuelven solos si la VM
+se reinicia.
 
-- Google Cloud Console → *Authorized JavaScript origins*: agregar
-  `https://album.midominio.com`.
-- Verificar: `curl https://album.midominio.com/api/health` y seguir la
-  [sección 9](#9-verificación-post-deploy).
-- Logs: `docker compose -f docker-compose.prod.yml logs -f backend caddy`.
+### 10.8 Google y verificación
+
+1. Google Cloud Console → *Credentials* → el OAuth client → *Authorized
+   JavaScript origins*: agregar `https://album.midominio.com` (sin `/` final).
+2. `curl https://album.midominio.com/api/health` → `200` con
+   `"database":"connected (PostgreSQL)"`.
+3. Seguir los pasos 2 a 5 de la [sección 9](#9-verificación-post-deploy--opción-b)
+   (login, panel de admin, escaneo, invitación).
+
+### 10.9 Operación
+
 - **Actualizar** a una versión nueva:
 
 ```bash
+cd ~/album
 git pull
 docker compose -f docker-compose.prod.yml up -d --build   # vuelve a correr migrate
 docker image prune -f
 ```
 
-- **Backups** de la base (a cargo propio), p. ej. con `cron` diario:
+- **Backups de la base** (a cargo propio). Un backup en la misma VM no protege
+  si se pierde la VM: copiarlo afuera (tu máquina, otro servicio).
 
 ```bash
-docker compose -f docker-compose.prod.yml exec -T postgres \
-  sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip > backup-$(date +%F).sql.gz
+mkdir -p ~/backups
+# crontab -e  → todos los días a las 4:00, conservando 14 días
+0 4 * * * cd ~/album && docker compose -f docker-compose.prod.yml exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip > ~/backups/db-$(date +\%F).sql.gz && find ~/backups -name 'db-*.sql.gz' -mtime +14 -delete
 ```
 
-- Mantener el SO al día (`sudo apt update && sudo apt upgrade`) y no publicar
-  el puerto de Postgres.
+  Bajarlos desde tu máquina: `scp 'ubuntu@IP_PUBLICA:backups/*.sql.gz' .`.
+  Además, Oracle permite hasta 5 backups gratis del volumen de arranque
+  (*Block Storage → Boot Volumes → Create Backup*).
+- **Restaurar** un backup:
+  `gunzip -c db-AAAA-MM-DD.sql.gz | docker compose -f docker-compose.prod.yml exec -T postgres sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"'`.
+- **Logs:** `docker compose -f docker-compose.prod.yml logs -f backend caddy`.
+- **Seguridad:** no publicar el puerto de Postgres, mantener `.env` con
+  permisos `600` y el acceso SSH solo con clave (es el valor por defecto de la
+  imagen de Oracle).
 
 ---
 

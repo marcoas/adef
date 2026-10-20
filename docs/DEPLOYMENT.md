@@ -10,22 +10,43 @@ decidir.
 
 ## 1. Opciones
 
-| | **A. Servicios administrados** | **B. Oracle Cloud Always Free** |
+**Decisión (2026-10-20): opción A, Oracle Cloud Always Free.** Es la única
+combinación de costo 0 que permite **publicidad** (prevista a futuro) y
+además no se duerme y tiene mucha más capacidad. Guía paso a paso:
+[DEPLOY_GUIDE.md §10](DEPLOY_GUIDE.md#10-opción-a-recomendada-oracle-cloud-always-free).
+
+| | **A. Oracle Cloud Always Free** (elegida) | **B. Servicios administrados** |
 |---|---|---|
-| Frontend | Vercel (Hobby) | misma VM |
-| Backend | Render (Free Web Service) | VM ARM A1: 2 OCPU / 12 GB (Docker Compose) |
-| Base de datos | Neon (Free) | PostgreSQL en la VM |
-| Imágenes | Cloudinary (Free) | Cloudinary o disco local |
-| Tarjeta de crédito | No | Sí (verificación; *Pay As You Go* recomendado) |
-| Mantenimiento | Ninguno | SO, firewall, HTTPS, backups a cargo propio |
-| Se duerme | Sí, tras ~15 min sin tráfico (despierta en 30–60 s) | No |
+| Frontend | misma VM | Vercel (Hobby) |
+| Backend | VM ARM A1: 2 OCPU / 12 GB (Docker Compose) | Render (Free Web Service) |
+| Base de datos | PostgreSQL en la VM | Neon (Free) |
+| Imágenes | Cloudinary o disco local | Cloudinary (Free) |
+| Tarjeta de crédito | Sí (verificación; *Pay As You Go* recomendado) | No |
+| Mantenimiento | SO, firewall, HTTPS, backups a cargo propio | Ninguno |
+| Se duerme | No | Sí, tras ~15 min sin tráfico (despierta en 30–60 s) |
+| **Publicidad / uso comercial** | ✅ Sin restricción encontrada | ❌ Vercel Hobby lo prohíbe (incluye anuncios tipo AdSense); Render free no está pensado para producción |
 
-Ambas opciones usan **un solo repositorio**: Vercel apunta a `frontend/` y
-Render a `backend/` mediante *Root Directory*.
+Ambas opciones usan **un solo repositorio**: en la B, Vercel apunta a
+`frontend/` y Render a `backend/` mediante *Root Directory*.
 
-> ⚠️ En la opción A **no** usar `IMAGE_PROVIDER=local`: el disco de Render es
+> ⚠️ En la opción B **no** usar `IMAGE_PROVIDER=local`: el disco de Render es
 > efímero y las fotos se pierden en cada deploy/reinicio. La base gratis de
 > Render se borra a los 30 días: por eso Neon.
+
+### Uso comercial y publicidad por servicio
+
+| Servicio | ¿Permite publicidad en el plan gratis? |
+|---|---|
+| Oracle Always Free | Sí: no se encontró restricción (sin SLA). |
+| Vercel Hobby | **No**: solo uso no comercial; los anuncios cuentan como comercial. Requiere Pro. |
+| Render free | No lo prohíbe explícitamente, pero no está pensado para producción. |
+| Neon free | Sí (sin SLA; se suspende si se agota la cuota). |
+| Cloudinary free | Sí, incluso en producción, dentro de los créditos. |
+| Plate Recognizer free | **A confirmar**: fuentes de terceros lo describen como "solo evaluación". Consultar con ellos antes de monetizar (plan pago desde ~50 USD/mes). |
+
+Para publicidad también hace falta un **dominio propio** (las redes de
+anuncios verifican la propiedad), una política de privacidad y, si el público
+incluye menores, marcar el sitio como dirigido a niños.
 
 ---
 
@@ -51,7 +72,7 @@ Supuestos: cada usuario consulta las notificaciones cada 30 s (polling de
 `NotificationsBell`) y recarga el álbum una vez por minuto; CPU al 50% como
 margen; un escaneo envía la foto 2 veces (`/plates/ocr` y `/album/stickers`).
 
-| | Opción A (Render…) | Opción B (Oracle) |
+| | Opción B (Render…) | Opción A (Oracle) |
 |---|---|---|
 | Navegando | ~40–50 (álbumes de 300); ~20 con álbumes casi llenos | ~500–1.000 |
 | Escaneando a la vez (< 5 s de espera) | 1–2 con fotos grandes, 3–4 comprimidas | 20+ |
@@ -112,8 +133,8 @@ Google OAuth).
 ## Fuentes
 
 - Render: [Free](https://render.com/docs/free) · [Outbound bandwidth](https://render.com/docs/outbound-bandwidth) · [New bandwidth pricing](https://render.com/blog/new-bandwidth-pricing-on-render)
-- Neon: [Free plan limits](https://neon.com/faqs/free-plan-limits-and-quotas) · [Pricing](https://neon.com/pricing)
-- Plate Recognizer: [Sitio](https://platerecognizer.com/?p=332) · [Límite de 1 lectura/s](https://platerecognizer.com/zoneminder/)
-- Cloudinary: [Billing and plans](https://cloudinary.com/documentation/billing_and_plans)
-- Vercel: [Limits](https://vercel.com/docs/limits)
-- Oracle: [Always Free Resources](https://docs.oracle.com/en-us/iaas/Content/FreeTier/resourceref.htm) · [InfoQ: recorte de A1 a 2 OCPU / 12 GB](https://www.infoq.com/news/2026/07/oracle-cloud-free-tier-limits/) · [Reclamo de instancias ociosas](https://blog.51sec.org/2023/02/oracle-cloud-cleaning-up-idle-compute.html)
+- Neon: [Free plan limits](https://neon.com/faqs/free-plan-limits-and-quotas) · [Free to production](https://neon.com/faqs/postgres-services-free-to-production) · [Pricing](https://neon.com/pricing)
+- Plate Recognizer: [Sitio](https://platerecognizer.com/?p=332) · [Snapshot](https://platerecognizer.com/snapshot) · [FitGap ("evaluation only")](https://us.fitgap.com/products/platerecognizer-alpr) · [Límite de 1 lectura/s](https://platerecognizer.com/zoneminder/)
+- Cloudinary: [Billing and plans](https://cloudinary.com/documentation/billing_and_plans) · [FAQ del plan gratis](https://cloudinary.com/documentation/developer_onboarding_faq_free_plan)
+- Vercel: [Limits](https://vercel.com/docs/limits) · [Fair use Guidelines](https://vercel.com/docs/limits/fair-use-guidelines)
+- Oracle: [Always Free Resources](https://docs.oracle.com/en-us/iaas/Content/FreeTier/resourceref.htm) · [Free Tier FAQ](https://www.oracle.com/cloud/free/faq/) · [InfoQ: recorte de A1 a 2 OCPU / 12 GB](https://www.infoq.com/news/2026/07/oracle-cloud-free-tier-limits/) · [Reclamo de instancias ociosas](https://blog.51sec.org/2023/02/oracle-cloud-cleaning-up-idle-compute.html)

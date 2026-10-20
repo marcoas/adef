@@ -151,7 +151,7 @@ npm run prisma:generate       # refresca los tipos del cliente
 | [DATABASE_DER.md](DATABASE_DER.md) | Modelo de datos completo. |
 | [API.md](API.md) | Todos los endpoints. |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Hosting con costo 0 y capacidad medida. |
-| [DEPLOY_GUIDE.md](DEPLOY_GUIDE.md) | Despliegue paso a paso (Render + Vercel + Neon, u Oracle). |
+| [DEPLOY_GUIDE.md](DEPLOY_GUIDE.md) | Despliegue paso a paso (Oracle Cloud; alternativa Render + Vercel + Neon). |
 | Este archivo | Entorno, scripts y convenciones. |
 
 **Regla:** todo cambio (endpoints, arquitectura, dependencias, variables de

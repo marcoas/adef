@@ -21,11 +21,11 @@ Webapp lúdica y familiar (responsive mobile y desktop) inspirada en el concepto
 
 | Capa | Tecnología | Plataforma Hosting / Producción (Costo 0) |
 |---|---|---|
-| **Frontend** | React / Next.js, CSS Modules, Lucide Icons, i18next | Vercel |
-| **Backend** | Node.js, Express, TypeScript, Prisma ORM, Plate Recognizer API (OCR) | Render (Free) / Oracle Cloud Always Free |
-| **Base de Datos** | PostgreSQL 16 | Supabase / Neon (Free Tier) |
+| **Frontend** | React / Next.js, CSS Modules, Lucide Icons, i18next | Oracle Cloud Always Free (alternativa: Vercel) |
+| **Backend** | Node.js, Express, TypeScript, Prisma ORM, Plate Recognizer API (OCR) | Oracle Cloud Always Free (alternativa: Render) |
+| **Base de Datos** | PostgreSQL 16 | PostgreSQL en la VM de Oracle (alternativa: Neon) |
 | **Imágenes** | Cloudinary (Free Tier) / Local Provider | Cloudinary |
-| **Orquestación** | Docker & Docker Compose | Containerized local dev |
+| **Orquestación** | Docker & Docker Compose | Desarrollo local y producción en Oracle (`docker-compose.prod.yml` + Caddy) |
 
 ---
 
@@ -101,4 +101,4 @@ Guía completa de entorno, scripts, migraciones y convenciones: **[docs/DEVELOPM
 - [Referencia de la API REST (endpoints)](docs/API.md)
 - [Guía de Desarrollo (setup, scripts, convenciones)](docs/DEVELOPMENT.md)
 - [Despliegue: opciones de hosting y capacidad](docs/DEPLOYMENT.md)
-- [Guía de despliegue paso a paso (Render + Vercel + Neon, u Oracle Cloud)](docs/DEPLOY_GUIDE.md)
+- [Guía de despliegue paso a paso (Oracle Cloud; alternativa Render + Vercel + Neon)](docs/DEPLOY_GUIDE.md)
