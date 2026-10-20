@@ -10,6 +10,7 @@ import { getApiUsageSummary } from '../middleware/apiUsage';
 import { asyncHandler } from '../lib/asyncHandler';
 import { authUser } from '../types';
 import { deleteAccountCascade } from '../services/accountService';
+import { getMonthlyExternalApiUsage } from '../services/externalApiUsage';
 
 const router = Router();
 
@@ -57,11 +58,8 @@ router.get('/admin/dashboard', requireAuth, requireAdmin, asyncHandler(async (re
 
   // Issue #48: consumo de la API externa (Plate Recognizer) en el mes actual:
   // total de llamadas, exitosas, fallidas, cuota mensual, restante y %.
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const [extTotal, extOk] = await Promise.all([
-    prisma.externalApiCall.count({ where: { createdAt: { gte: monthStart } } }),
-    prisma.externalApiCall.count({ where: { createdAt: { gte: monthStart }, ok: true } }),
-  ]);
+  // (mismo conteo que usa el corte por cuota del OCR en alprService)
+  const { total: extTotal, ok: extOk } = await getMonthlyExternalApiUsage('plate_recognizer', now);
   const externalApiUsage = {
     provider: 'Plate Recognizer',
     monthLabel: now.toLocaleString('es-AR', { month: 'long', year: 'numeric' }),

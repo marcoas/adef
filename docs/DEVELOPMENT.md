@@ -67,7 +67,8 @@ Todas están documentadas en [`.env.example`](../.env.example). Las más relevan
 | `ADMIN_EMAILS` | Correos sembrados como admin en cada login (#41). |
 | `IMAGE_PROVIDER` | `local` o `cloudinary` (+ credenciales Cloudinary). |
 | `MAX_IMAGE_SIZE_MB` | Tamaño máximo de foto a subir (#10). |
-| `PLATE_RECOGNIZER_TOKEN` / `PLATE_RECOGNIZER_MONTHLY_QUOTA` | API ALPR y su cuota mensual (#48). |
+| `PLATE_RECOGNIZER_TOKEN` / `PLATE_RECOGNIZER_MONTHLY_QUOTA` | API ALPR y su cuota mensual (#48). Al alcanzar la cuota (llamadas del mes, exitosas + fallidas) el OCR deja de llamar a la API y responde `503`; `0` desactiva el corte. |
+| `TRUST_PROXY` | Saltos de proxy inverso confiables para tomar la IP real de `X-Forwarded-For` (rate limit por IP). Por defecto `1` con `NODE_ENV=production` y desactivado en desarrollo; `0`/`false` lo desactiva. `true` se degrada a `1` por inseguro. |
 | `NEXT_PUBLIC_API_URL` | URL de la API para el frontend. |
 | `FRONTEND_URL` | URL pública del frontend (para armar links de invitación). |
 

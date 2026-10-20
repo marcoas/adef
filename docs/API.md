@@ -7,7 +7,8 @@ Las rutas viven en [`backend/src/routes/`](../backend/src/routes/), un archivo p
 - **Formato de respuesta:** JSON. Los errores devuelven `{ "error": "<mensaje>" }` con el código HTTP correspondiente.
 - **Autenticación:** la mayoría de las rutas exigen `Authorization: Bearer <JWT>` (emitido en `POST /api/auth/login`, vigencia 7 días). Sin token → `401`.
 - **Usuario restringido:** las cuentas con `status = RESTRICTED` (Issue #41) reciben `403` en el login y en toda ruta autenticada.
-- **Límite de tasa:** todas las rutas `/api` tienen un tope por IP; `/auth/login`, `/plates/ocr` y `/plates/parse` uno más estricto. Al superarlo → `429`.
+- **Límite de tasa:** todas las rutas `/api` tienen un tope por IP; `/auth/login`, `/plates/ocr` y `/plates/parse` uno más estricto. Al superarlo → `429`. Detrás de un proxy inverso la IP se toma de `X-Forwarded-For` según `TRUST_PROXY` (por defecto 1 salto en producción).
+- **Compresión:** las respuestas compresibles de más de 1 KB se envían con `gzip` si el cliente envía `Accept-Encoding: gzip` (middleware `compression`).
 - **Álbum activo:** varias rutas aceptan `albumId` (query o body) para operar sobre un álbum compartido; sin parámetro se usa el álbum propio del usuario (Issue #8 / #12).
 
 ---
@@ -26,7 +27,7 @@ Las rutas viven en [`backend/src/routes/`](../backend/src/routes/), un archivo p
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `POST` | `/api/plates/ocr` | ✅ | Recibe `{ imageBase64 }` y devuelve la patente detectada. Delegado a Plate Recognizer (requiere `PLATE_RECOGNIZER_TOKEN`; sin token o si la API falla responde `503`); cada llamada real se registra en `external_api_calls` (#48). |
+| `POST` | `/api/plates/ocr` | ✅ | Recibe `{ imageBase64 }` y devuelve la patente detectada. Delegado a Plate Recognizer (requiere `PLATE_RECOGNIZER_TOKEN`); cada llamada real se registra en `external_api_calls` (#48). Las llamadas a Plate Recognizer salen a 1 por segundo como máximo: las concurrentes esperan su turno en orden, por lo que la respuesta puede demorar algunos segundos con mucha carga. Errores: `400` sin imagen; `503` sin token o si la API falla (`{ error }`); `503` con `{ error, code: "OCR_QUOTA_EXCEEDED" }` y header `Retry-After` (segundos hasta el mes siguiente) si el consumo del mes ya alcanzó `PLATE_RECOGNIZER_MONTHLY_QUOTA` — en ese caso no se llama a la API externa. |
 | `POST` | `/api/plates/parse` | ✅ | Recibe `{ text }` y aplica las expresiones regulares de patente (`AAA 000` / `AA 000 AA`) devolviendo el casillero (`extractPlate`). |
 
 ## Álbum y figuritas

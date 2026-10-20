@@ -19,6 +19,38 @@ export const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_patent
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 export const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
+/**
+ * `trust proxy` de Express: cuántos saltos de proxy inverso (Render, Caddy,
+ * nginx...) se consideran confiables para tomar la IP real del cliente desde
+ * `X-Forwarded-For`. Sin esto, detrás de un proxy `req.ip` es la IP del proxy
+ * y el rate limit por IP termina siendo global (todos comparten el cupo).
+ *
+ * Valores aceptados en `TRUST_PROXY`:
+ * - número de saltos (`1`, `2`...): lo recomendado; `0` o `false` lo desactiva.
+ * - lista de IPs/subredes o nombres de Express (`loopback`, `10.0.0.0/8`...).
+ * - `true` NO se acepta tal cual: confiaría en cualquier `X-Forwarded-For`
+ *   (falsificable por el cliente para evadir el rate limit, y
+ *   express-rate-limit lo marca como inseguro); se degrada a `1` con aviso.
+ *
+ * Por defecto: `1` en producción (un proxy delante) y desactivado en
+ * desarrollo, donde el backend se expone directo.
+ */
+export function parseTrustProxy(raw: string | undefined, isProduction: boolean): boolean | number | string {
+  const value = (raw ?? '').trim().toLowerCase();
+  if (value === '') return isProduction ? 1 : false;
+  if (value === 'false') return false;
+  if (/^\d+$/.test(value)) {
+    const hops = parseInt(value, 10);
+    return hops === 0 ? false : hops;
+  }
+  if (value === 'true') {
+    console.warn('TRUST_PROXY=true es inseguro (X-Forwarded-For falsificable); se usa 1 salto de proxy.');
+    return 1;
+  }
+  return raw!.trim();
+}
+export const TRUST_PROXY = parseTrustProxy(process.env.TRUST_PROXY, process.env.NODE_ENV === 'production');
+
 // Issue #10: límites de carga de imágenes (solo JPG/PNG y tamaño máximo)
 export const MAX_IMAGE_SIZE_MB = parseInt(process.env.MAX_IMAGE_SIZE_MB || '5', 10);
 export const ALLOWED_IMAGE_MIME = ['image/jpeg', 'image/png'];

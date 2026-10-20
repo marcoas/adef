@@ -67,7 +67,7 @@ adef/
 
 ### Backend (`backend/src/`)
 
-- **Middlewares (`app.ts`):** `helmet` (headers de seguridad), `cors`, `express.json()`, contador de consumo de la API (`middleware/apiUsage.ts`) y servido estático de `/uploads`.
+- **Middlewares (`app.ts`):** `trust proxy` (configurable con `TRUST_PROXY`, para que `req.ip` sea la IP real detrás de Render/Caddy/nginx), `helmet` (headers de seguridad), `cors`, `express.json()`, compresión gzip (`compression`), límite de tasa por IP (`middleware/rateLimit.ts`), contador de consumo de la API (`middleware/apiUsage.ts`) y servido estático de `/uploads`.
 - **Autenticación (`middleware/auth.ts`):** JWT (`jsonwebtoken`, 7 días). `requireAuth` valida el token, carga el usuario de la BD y bloquea cuentas `RESTRICTED` (#41); `requireAdmin` exige `isAdmin`.
 - **Rutas (`routes/`):** un `Router` por dominio (auth, plates, álbum/figuritas/ranking, invitaciones/miembros, notificaciones, usuario, administración, health), montados bajo `/api` en `app.ts`. Cada handler se envuelve con `asyncHandler`, que loguea y responde 500 ante errores no controlados. La referencia completa está en [`API.md`](API.md).
 - **Para sumar un dominio:** crear `routes/<dominio>.ts`, poner la lógica reutilizable en `services/` y montarlo en `app.ts`.
@@ -75,7 +75,7 @@ adef/
   - `services/albumService.ts` — `getOrCreateUserAlbum`, `requireOwnAlbum`, `resolveAccessibleAlbum` (álbum propio o compartido #8/#12/#37), `serializeSticker` y `validateImageInput` (#10).
   - `services/notificationService.ts`, `services/accountService.ts`, `services/externalApiUsage.ts` — avisos (#34), baja de cuentas (#41/#54) y consumo de APIs externas (#48).
   - `utils/plateExtractor.ts` — validación de formatos de patente y cálculo del casillero.
-  - `services/alprService.ts` — reconocimiento ALPR con fallback OCR (#48 registra el consumo).
+  - `services/alprService.ts` — reconocimiento ALPR delegado a Plate Recognizer. Limitador en memoria (1 llamada/s, FIFO) y corte por cuota mensual (`OcrQuotaExceededError`); el registro y el conteo del consumo (#48) se inyectan vía `ALPRDeps` desde `services/externalApiUsage.ts`, sin acoplar el servicio a la BD.
   - `services/images/` — fachada `storeImage` / `deleteStoredImages` con proveedores *local* y *cloudinary* (#35).
 
 ### Frontend (Next.js App Router)

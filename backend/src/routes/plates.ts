@@ -3,8 +3,14 @@
  */
 import { Router } from 'express';
 import { extractPlate } from '../utils/plateExtractor';
-import { recognizePlateALPR, OcrNotConfiguredError, OcrProviderError } from '../services/alprService';
-import { recordExternalApiCall } from '../services/externalApiUsage';
+import {
+  recognizePlateALPR,
+  OcrNotConfiguredError,
+  OcrProviderError,
+  OcrQuotaExceededError,
+} from '../services/alprService';
+import { recordExternalApiCall, getMonthlyExternalApiUsage } from '../services/externalApiUsage';
+import { PLATE_RECOGNIZER_MONTHLY_QUOTA } from '../config';
 import { asyncHandler } from '../lib/asyncHandler';
 import { requireAuth } from '../middleware/auth';
 import { strictLimiter } from '../middleware/rateLimit';
@@ -20,13 +26,29 @@ router.post('/plates/ocr', strictLimiter, requireAuth, asyncHandler(async (req, 
   }
 
   // Issue #48: se registra cada llamada real a Plate Recognizer (éxito o
-  // fallo) en la BD para el consumo del mes en el panel de administración.
+  // fallo) en la BD para el consumo del mes en el panel de administración, y
+  // con ese mismo consumo se corta antes de superar la cuota mensual.
   try {
     const alprResult = await recognizePlateALPR(imageBase64, {
       recordExternalCall: (ok) => recordExternalApiCall(ok),
+      getMonthlyUsage: async () => (await getMonthlyExternalApiUsage()).total,
+      monthlyQuota: PLATE_RECOGNIZER_MONTHLY_QUOTA,
     });
     return res.json(alprResult);
   } catch (error) {
+    if (error instanceof OcrQuotaExceededError) {
+      console.warn('OCR bloqueado por cuota mensual:', error.message);
+      // Retry-After: segundos hasta el comienzo del mes siguiente (cuando se
+      // renueva la cuota). Se responde 503 y no 429: no es un abuso del
+      // cliente sino un límite del servicio externo compartido por todos.
+      const now = new Date();
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      res.set('Retry-After', String(Math.max(1, Math.ceil((nextMonth.getTime() - now.getTime()) / 1000))));
+      return res.status(503).json({
+        error: 'Se alcanzó el límite mensual de reconocimientos automáticos de patentes. Podés cargar la patente a mano; el reconocimiento vuelve a estar disponible el mes próximo.',
+        code: 'OCR_QUOTA_EXCEEDED',
+      });
+    }
     if (error instanceof OcrNotConfiguredError || error instanceof OcrProviderError) {
       console.error('OCR no disponible:', error.message);
       return res.status(503).json({ error: 'El reconocimiento de patentes no está disponible en este momento' });
