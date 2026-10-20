@@ -5,6 +5,11 @@ import { Request, Response } from 'express';
 import { Album, Sticker, User } from '@prisma/client';
 import { prisma } from '../db';
 import { ALLOWED_IMAGE_MIME, MAX_IMAGE_SIZE_MB } from '../config';
+
+// Hosts permitidos para una `imageUrl` http(s) enviada por el cliente: el
+// proveedor de imágenes en la nube (#35) y el placeholder de Unsplash usado
+// como fallback. Las fotos reales llegan como data URL (cámara/archivo).
+const ALLOWED_IMAGE_HOSTS = ['res.cloudinary.com', 'images.unsplash.com'];
 import { AuthedRequest } from '../types';
 
 export interface AlbumContext {
@@ -115,7 +120,20 @@ export function validateImageInput(imageUrl: string): { status: number; error: s
     if (sizeMb > MAX_IMAGE_SIZE_MB) {
       return { status: 413, error: `La imagen supera el tamaño máximo permitido (${MAX_IMAGE_SIZE_MB} MB).` };
     }
-  } else if (!/^https?:\/\//i.test(imageUrl)) {
+  } else if (/^https?:\/\//i.test(imageUrl)) {
+    // Solo se aceptan URLs externas de hosts conocidos. Así una figurita no
+    // puede guardar una URL arbitraria que, al renderizarse en el <img> de
+    // otro miembro, filtre su IP a un servidor atacante (beacon de tracking).
+    let host = '';
+    try {
+      host = new URL(imageUrl).hostname.toLowerCase();
+    } catch {
+      return { status: 400, error: 'imageUrl inválida.' };
+    }
+    if (!ALLOWED_IMAGE_HOSTS.includes(host)) {
+      return { status: 400, error: 'imageUrl no permitida.' };
+    }
+  } else {
     return { status: 400, error: 'imageUrl inválida.' };
   }
   return null;

@@ -7,6 +7,7 @@ Las rutas viven en [`backend/src/routes/`](../backend/src/routes/), un archivo p
 - **Formato de respuesta:** JSON. Los errores devuelven `{ "error": "<mensaje>" }` con el código HTTP correspondiente.
 - **Autenticación:** la mayoría de las rutas exigen `Authorization: Bearer <JWT>` (emitido en `POST /api/auth/login`, vigencia 7 días). Sin token → `401`.
 - **Usuario restringido:** las cuentas con `status = RESTRICTED` (Issue #41) reciben `403` en el login y en toda ruta autenticada.
+- **Límite de tasa:** todas las rutas `/api` tienen un tope por IP; `/auth/login`, `/plates/ocr` y `/plates/parse` uno más estricto. Al superarlo → `429`.
 - **Álbum activo:** varias rutas aceptan `albumId` (query o body) para operar sobre un álbum compartido; sin parámetro se usa el álbum propio del usuario (Issue #8 / #12).
 
 ---
@@ -25,15 +26,15 @@ Las rutas viven en [`backend/src/routes/`](../backend/src/routes/), un archivo p
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `POST` | `/api/plates/ocr` | — | Recibe `{ imageBase64 }` y devuelve la patente detectada. Usa Plate Recognizer (si hay token) con fallback a Tesseract.js; cada llamada real se registra en `external_api_calls` (#48). |
-| `POST` | `/api/plates/parse` | — | Recibe `{ text }` y aplica las expresiones regulares de patente (`AAA 000` / `AA 000 AA`) devolviendo el casillero (`extractPlate`). |
+| `POST` | `/api/plates/ocr` | ✅ | Recibe `{ imageBase64 }` y devuelve la patente detectada. Usa Plate Recognizer (si hay token) con fallback a Tesseract.js; cada llamada real se registra en `external_api_calls` (#48). |
+| `POST` | `/api/plates/parse` | ✅ | Recibe `{ text }` y aplica las expresiones regulares de patente (`AAA 000` / `AA 000 AA`) devolviendo el casillero (`extractPlate`). |
 
 ## Álbum y figuritas
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
 | `GET` | `/api/album?albumId=` | ✅ | Devuelve el álbum accesible (propio o compartido) con las 1000 posiciones, progreso y mapa de figuritas. |
-| `POST` | `/api/album/stickers` | ✅ | Pega una figurita: body `{ plateText, imageUrl?, albumId? }`. Valida formato/tamaño de imagen (#10), extrae el casillero, chequea unicidad (`409` si ya está ocupado) y registra la actividad (#33) + notificación (#34). |
+| `POST` | `/api/album/stickers` | ✅ | Pega una figurita: body `{ plateText, imageUrl?, albumId? }`. Valida formato/tamaño de imagen (#10; `imageUrl` http(s) solo de hosts permitidos), extrae el casillero, chequea unicidad (`409` si ya está ocupado) y registra la actividad (#33) + notificación (#34). |
 | `DELETE` | `/api/album/stickers/:slotNumber` | ✅ | Despega la figurita del casillero (solo dueño del álbum), borra la imagen del almacenamiento y registra la actividad. |
 | `GET` | `/api/album/activity` | ✅ | Log de movimientos del álbum (#33). Query: `limit` (def. 40), `page`, `action` (`PASTE` / `UNPASTE`). |
 | `GET` | `/api/albums` | ✅ | Lista los álbumes del usuario: el propio (`role: OWNER`) + los compartidos donde es asociado, con cantidad de figuritas. |

@@ -6,12 +6,13 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../db';
 import { ADMIN_EMAILS, JWT_SECRET } from '../config';
 import { requireAuth } from '../middleware/auth';
+import { strictLimiter } from '../middleware/rateLimit';
 import { asyncHandler } from '../lib/asyncHandler';
 import { authUser } from '../types';
 
 const router = Router();
 
-router.post('/auth/login', asyncHandler(async (req, res) => {
+router.post('/auth/login', strictLimiter, asyncHandler(async (req, res) => {
   const { email, name, avatarUrl, idToken, authProvider } = req.body;
   let userEmail = email;
   let userName = name;
