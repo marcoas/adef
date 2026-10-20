@@ -10,23 +10,13 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Bell, BellRing, CheckCheck, History, Sparkles, Users, X } from 'lucide-react';
-import { getTranslation, Locale } from '../lib/i18n';
-
-export interface NotificationItem {
-  id: string;
-  type: 'STICKER_PASTED' | 'ASSOCIATE_JOINED' | 'ASSOCIATE_LEFT' | 'ACCESS_REVOKED';
-  albumId: string;
-  albumTitle: string;
-  actorName: string;
-  slotNumber: number | null;
-  rawPlate: string | null;
-  message: string;
-  readAt: string | null;
-  createdAt: string;
-}
+import { useLocale } from '../lib/LocaleContext';
+import { apiFetch } from '../lib/api';
+import { dateLocale } from '../lib/format';
+import { getToken } from '../lib/session';
+import type { NotificationItem } from '../types/domain';
 
 interface NotificationsBellProps {
-  locale: Locale;
   userSession: { name: string; email: string } | null;
   onOpenActivityLog?: () => void;
   onSelectNotification?: (notification: NotificationItem) => void;
@@ -44,12 +34,11 @@ const LAST_SEEN_KEY = 'notifications_last_seen_at';
  * también el aviso nativo del navegador.
  */
 export const NotificationsBell: React.FC<NotificationsBellProps> = ({
-  locale,
   userSession,
   onOpenActivityLog,
   onSelectNotification,
 }) => {
-  const t = getTranslation(locale);
+  const { locale, t } = useLocale();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -57,19 +46,12 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const lastSeenRef = useRef<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-
-  const authToken = () => (typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null);
-
   const fetchNotifications = useCallback(
     async (allowNativeAlert: boolean) => {
-      const jwtToken = authToken();
-      if (!jwtToken) return;
+      if (!getToken()) return;
 
       try {
-        const res = await fetch(`${apiUrl}/notifications?limit=20`, {
-          headers: { Authorization: `Bearer ${jwtToken}` },
-        });
+        const res = await apiFetch('/notifications?limit=20');
         if (!res.ok) return;
 
         const data = await res.json();
@@ -112,7 +94,7 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
         console.error('Error al consultar las notificaciones:', err);
       }
     },
-    [apiUrl],
+    [],
   );
 
   // Permiso del navegador para los avisos nativos
@@ -157,14 +139,12 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
   }, [isOpen]);
 
   const markNotificationsAsRead = async (ids: string[]) => {
-    const jwtToken = authToken();
-    if (!jwtToken) return;
+    if (!getToken()) return;
 
     try {
-      await fetch(`${apiUrl}/notifications/read`, {
+      await apiFetch('/notifications/read', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwtToken}` },
-        body: JSON.stringify(ids.length > 0 ? { ids } : {}),
+        json: ids.length > 0 ? { ids } : {},
       });
       const now = new Date().toISOString();
       const next = notifications.map((n) =>
@@ -196,7 +176,7 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
   const formatRelative = (iso: string) => {
     const diffMs = Date.now() - new Date(iso).getTime();
     const minutes = Math.floor(diffMs / 60000);
-    const localeCode = locale === 'en' ? 'en-US' : 'es-AR';
+    const localeCode = dateLocale(locale);
 
     if (minutes < 1) return locale === 'en' ? 'just now' : 'ahora';
     if (minutes < 60) return locale === 'en' ? `${minutes} min ago` : `hace ${minutes} min`;

@@ -11,11 +11,10 @@
 
 import React, { useEffect, useRef } from 'react';
 import { AlertTriangle, Loader2, Trash2, X } from 'lucide-react';
-import { getTranslation, Locale } from '../lib/i18n';
+import { useLocale } from '../lib/LocaleContext';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
-  locale: Locale;
   title: string;
   /** Texto previo al fragmento destacado (ej: "¿Seguro que querés despegar la figurita del casillero") */
   message: string;
@@ -38,7 +37,6 @@ interface ConfirmDialogProps {
  */
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isOpen,
-  locale,
   title,
   message,
   highlight,
@@ -51,7 +49,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
-  const t = getTranslation(locale);
+  const { t } = useLocale();
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   // Esc cancela y el foco arranca en "Cancelar" (acción segura por defecto)

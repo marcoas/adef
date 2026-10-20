@@ -9,43 +9,42 @@
  *   - Carga del álbum activo y de la lista de álbumes propios/compartidos #12,
  *     con manejo de sesión expirada (401) y de acceso revocado (403 #37).
  *   - Render de Header, AlbumGrid y de todos los modales: captura/OCR #53,
- *     detalle de casillero, login #6, invitaciones #12, panel de usuario #15,
+ *     detalle de casillero, login #6, panel de usuario #15 (invitaciones #12),
  *     administración #41 y log de movimientos #33.
  *   - Manejadores compartidos: pegar/despegar figuritas, cambio de álbum,
  *     apertura de casilleros, notificaciones y scroll al casillero
  *     detectado por OCR #53.
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Header } from '../components/Header';
-import { AlbumGrid, AlbumOption } from '../components/AlbumGrid';
+import { AlbumGrid } from '../components/AlbumGrid';
 import { UploadModal } from '../components/UploadModal';
-import { StickerModal, StickerData } from '../components/StickerModal';
+import { StickerModal } from '../components/StickerModal';
 import { LoginModal } from '../components/LoginModal';
-import { InviteModal } from '../components/InviteModal';
 import { UserModal } from '../components/UserModal';
 // Issue #41: panel privado de administración (solo usuarios admin)
 import { AdminPanel } from '../components/AdminPanel';
 import { ActivityLogModal } from '../components/ActivityLogModal';
-import { NotificationItem } from '../components/NotificationsBell';
-import { Locale } from '../lib/i18n';
+import type { AlbumOption, NotificationItem, StickerData, UserSession } from '../types/domain';
+import { apiFetch, readJson, withAlbum } from '../lib/api';
+import { clearSession, getToken, loadStoredUser, storeUser } from '../lib/session';
 
-interface UserSession {
-  email: string;
-  name: string;
-  avatarUrl?: string;
-  // Issue #41: datos de cuenta para el panel de administración
-  id?: string;
-  isAdmin?: boolean;
+// useSearchParams() exige un límite de Suspense para que `next build` pueda
+// prerenderizar la página (el contenido se resuelve en el cliente).
+export default function HomePage() {
+  return (
+    <Suspense fallback={null}>
+      <HomeContent />
+    </Suspense>
+  );
 }
 
-export default function HomePage() {
+function HomeContent() {
   const searchParams = useSearchParams();
-  const [locale, setLocale] = useState<Locale>('es');
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [uploadTargetSlot, setUploadTargetSlot] = useState<number | null>(null);
@@ -67,26 +66,19 @@ export default function HomePage() {
   // Cargar sesión guardada y datos reales desde PostgreSQL backend API
   const fetchAlbumFromPostgreSQL = useCallback(async (albumId?: string | null) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
       // Issue #8: el álbum se solicita con el token para que el backend
       // devuelva únicamente el álbum del usuario autenticado.
-      const jwtToken = localStorage.getItem('jwt_token');
-      if (!jwtToken) {
+      if (!getToken()) {
         setStickers({});
         setIsLoading(false);
         return;
       }
 
-      const targetAlbum = albumId || activeAlbumId;
-      const res = await fetch(
-        `${apiUrl}/album${targetAlbum ? `?albumId=${targetAlbum}` : ''}`,
-        { headers: { Authorization: `Bearer ${jwtToken}` } }
-      );
+      const res = await apiFetch(withAlbum('/album', albumId || activeAlbumId));
 
       if (res.status === 401) {
         // Sesión inválida/expirada: se limpia para no mostrar datos ajenos
-        localStorage.removeItem('user_session');
-        localStorage.removeItem('jwt_token');
+        clearSession();
         setUserSession(null);
         setStickers({});
         return;
@@ -102,7 +94,7 @@ export default function HomePage() {
       // álbum abierto, el backend responde 403 con accessRevoked: expulsar al
       // instante al álbum propio y avisar, para no seguir viendo/cargando fotos.
       else if (res.status === 403) {
-        const data = await res.json().catch(() => ({}));
+        const data = await readJson(res);
         if (data.accessRevoked) {
           setActiveAlbumId(null);
           setStickers({});
@@ -123,14 +115,10 @@ export default function HomePage() {
 
   // Issue #12: lista de álbumes (propio + compartidos por invitación)
   const fetchMyAlbums = useCallback(async () => {
-    const jwtToken = localStorage.getItem('jwt_token');
-    if (!jwtToken) return [];
+    if (!getToken()) return [];
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
     try {
-      const res = await fetch(`${apiUrl}/albums`, {
-        headers: { Authorization: `Bearer ${jwtToken}` },
-      });
+      const res = await apiFetch('/albums');
       if (!res.ok) return [];
       const data = await res.json();
       return (data.albums || []) as AlbumOption[];
@@ -143,20 +131,16 @@ export default function HomePage() {
   // Issue #41: refrescar datos de cuenta (id, rol admin) desde el backend
   // para sesiones guardadas antes de que el login empezara a devolverlos.
   const refreshUserSession = useCallback(async () => {
-    const jwtToken = localStorage.getItem('jwt_token');
-    if (!jwtToken) return;
+    if (!getToken()) return;
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-      const res = await fetch(`${apiUrl}/auth/me`, {
-        headers: { Authorization: `Bearer ${jwtToken}` },
-      });
+      const res = await apiFetch('/auth/me');
       if (!res.ok) return;
       const data = await res.json();
       const fresh = data.user as { id?: string; isAdmin?: boolean; name?: string; avatarUrl?: string | null };
       setUserSession((prev) => {
         if (!prev) return prev;
         const next: UserSession = { ...prev, id: fresh.id ?? prev.id, isAdmin: !!fresh.isAdmin };
-        localStorage.setItem('user_session', JSON.stringify(next));
+        storeUser(next);
         return next;
       });
     } catch (e) {
@@ -166,15 +150,11 @@ export default function HomePage() {
 
   useEffect(() => {
     // Restaurar sesión de usuario persistida
-    const savedSession = typeof window !== 'undefined' ? localStorage.getItem('user_session') : null;
+    const savedSession = loadStoredUser();
     if (savedSession) {
-      try {
-        setUserSession(JSON.parse(savedSession));
-        // Issue #41: completar id/isAdmin si la sesión guardada es antigua
-        void refreshUserSession();
-      } catch (e) {
-        console.error('Error parseando user_session de localStorage:', e);
-      }
+      setUserSession(savedSession);
+      // Issue #41: completar id/isAdmin si la sesión guardada es antigua
+      void refreshUserSession();
     }
   }, [refreshUserSession]);
 
@@ -291,8 +271,7 @@ export default function HomePage() {
   }, [pendingNotificationSlot, isLoading]);
 
   const handleLogout = () => {
-    localStorage.removeItem('user_session');
-    localStorage.removeItem('jwt_token');
+    clearSession();
     setUserSession(null);
     setIsUserModalOpen(false);
     // Issue #41: al cerrar sesión se cierra también el panel de administración
@@ -328,11 +307,8 @@ export default function HomePage() {
     <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Header Principal con Auth y Menú de Usuario (Issue #15) */}
       <Header 
-        locale={locale} 
-        setLocale={setLocale} 
         onOpenUpload={handleOpenUpload}
         onOpenLogin={() => setIsLoginOpen(true)}
-        onOpenInvite={() => setIsInviteOpen(true)}
         onOpenUserModal={() => setIsUserModalOpen(true)}
         onLogout={handleLogout}
         userSession={userSession}
@@ -342,7 +318,6 @@ export default function HomePage() {
 
       {/* Rejilla de Figuritas del Álbum 000-999 con Controles Sticky (Issue #16), Filtro Unificado (Issue #13) y Buscador Compacto (Issue #14) */}
       <AlbumGrid 
-        locale={locale}
         stickers={stickers}
         onSlotClick={handleSlotClick}
         userSession={userSession}
@@ -364,7 +339,6 @@ export default function HomePage() {
           // Issue #53: al cerrar el popup se descarta el casillero previsualizado
           setPreviewSlot(null);
         }}
-        locale={locale}
         onStickerAdded={handleStickerAdded}
         targetSlot={uploadTargetSlot}
         albumId={activeAlbumId}
@@ -378,7 +352,6 @@ export default function HomePage() {
         sticker={selectedSlot !== null ? stickers[selectedSlot] || null : null}
         isOpen={selectedSlot !== null}
         onClose={() => setSelectedSlot(null)}
-        locale={locale}
         onStickerDeleted={handleStickerDeleted}
         // Issue #12: en un álbum compartido el invitado no puede eliminar
         isOwner={!!userSession && isActiveAlbumOwner}
@@ -389,26 +362,15 @@ export default function HomePage() {
       <LoginModal 
         isOpen={isLoginOpen}
         onClose={() => setIsLoginOpen(false)}
-        locale={locale}
         onLoginSuccess={handleLoginSuccess}
-      />
-
-      {/* Issue #12: generador de links de invitación de un solo uso */}
-      <InviteModal
-        isOpen={isInviteOpen}
-        onClose={() => setIsInviteOpen(false)}
-        locale={locale}
       />
 
       {/* Issue #15: Panel de Usuario para logout, cambiar idioma, ver y revocar invitaciones */}
       <UserModal
         isOpen={isUserModalOpen}
         onClose={() => setIsUserModalOpen(false)}
-        locale={locale}
-        setLocale={setLocale}
         userSession={userSession}
         onLogout={handleLogout}
-        onOpenInviteModal={() => setIsInviteOpen(true)}
         // Issue #41: acceso al panel privado de administración (solo admins)
         onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
       />
@@ -417,7 +379,6 @@ export default function HomePage() {
       <AdminPanel
         isOpen={isAdminPanelOpen && !!userSession?.isAdmin}
         onClose={() => setIsAdminPanelOpen(false)}
-        locale={locale}
         currentUserId={userSession?.id ?? null}
       />
 
@@ -425,7 +386,6 @@ export default function HomePage() {
       <ActivityLogModal
         isOpen={isActivityLogOpen}
         onClose={() => setIsActivityLogOpen(false)}
-        locale={locale}
         albumId={activeAlbumId}
       />
     </main>

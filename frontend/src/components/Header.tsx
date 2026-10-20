@@ -10,26 +10,17 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Users, Car, Globe, LogIn, UserCheck, LogOut, ChevronDown, User, ShieldCheck } from 'lucide-react';
-import { getTranslation, Locale } from '../lib/i18n';
-import { NotificationsBell, NotificationItem } from './NotificationsBell';
+import { Camera, Car, LogIn, UserCheck, LogOut, ChevronDown, User } from 'lucide-react';
+import { useLocale } from '../lib/LocaleContext';
+import type { NotificationItem, UserSession } from '../types/domain';
+import { NotificationsBell } from './NotificationsBell';
 
 // Issue #36: el tema se aplica al montar y se controla desde el panel de usuario (#43)
 import { getStoredTheme, applyTheme } from '../lib/theme';
 
-interface UserSession {
-  email: string;
-  name: string;
-  avatarUrl?: string;
-  authProvider?: string;
-}
-
 interface HeaderProps {
-  locale: Locale;
-  setLocale: (lang: Locale) => void;
   onOpenUpload: () => void;
   onOpenLogin: () => void;
-  onOpenInvite?: () => void;
   onOpenUserModal?: () => void;
   onLogout?: () => void;
   userSession: UserSession | null;
@@ -50,18 +41,15 @@ const GoogleIcon = () => (
 );
 
 export const Header: React.FC<HeaderProps> = ({
-  locale,
-  setLocale,
   onOpenUpload,
   onOpenLogin,
-  onOpenInvite = () => {},
   onOpenUserModal = () => {},
   onLogout,
   userSession,
   onOpenActivityLog,
   onSelectNotification,
 }) => {
-  const t = getTranslation(locale);
+  const { t } = useLocale();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -122,7 +110,6 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Issue #34: campana de notificaciones de actividad del álbum */}
           {userSession && (
             <NotificationsBell
-              locale={locale}
               userSession={userSession}
               onOpenActivityLog={onOpenActivityLog}
               onSelectNotification={onSelectNotification}

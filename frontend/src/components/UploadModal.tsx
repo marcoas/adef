@@ -11,12 +11,15 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Upload, CheckCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
-import { getTranslation, Locale } from '../lib/i18n';
+import { useLocale } from '../lib/LocaleContext';
+import { apiFetch, readJson, withAlbum } from '../lib/api';
+import { extractSlot, extractSlotDigits, padSlot } from '../lib/format';
+import { getToken } from '../lib/session';
+import { Modal } from './Modal';
 
 interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  locale: Locale;
   onStickerAdded: (slotNumber: number, rawPlate: string, imageUrl: string) => void;
   targetSlot?: number | null;
   // Issue #12: álbum destino (compartido) al que se sube la figurita
@@ -30,13 +33,12 @@ interface UploadModalProps {
 export const UploadModal: React.FC<UploadModalProps> = ({
   isOpen,
   onClose,
-  locale,
   onStickerAdded,
   targetSlot = null,
   albumId = null,
   onPlateDetected,
 }) => {
-  const t = getTranslation(locale);
+  const { t } = useLocale();
   const [plateInput, setPlateInput] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isProcessingOCR, setIsProcessingOCR] = useState(false);
@@ -49,8 +51,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   // popup sigue abierto. Si la patente cambia o se limpia, se informa null.
   useEffect(() => {
     if (!onPlateDetected) return;
-    const digitMatch = plateInput.match(/\d{3}/);
-    onPlateDetected(digitMatch ? parseInt(digitMatch[0], 10) : null);
+    onPlateDetected(extractSlot(plateInput));
   }, [plateInput, onPlateDetected]);
 
   // Issue #10: solo se aceptan imágenes JPG o PNG y de hasta 5 MB
@@ -108,12 +109,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     setErrorMsg(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-      const res = await fetch(`${apiUrl}/plates/ocr`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64 }),
-      });
+      const res = await apiFetch('/plates/ocr', { method: 'POST', json: { imageBase64 } });
 
       if (!res.ok) throw new Error('Error en API de OCR');
 
@@ -140,43 +136,33 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       return;
     }
 
-    const digitMatch = plateInput.match(/\d{3}/);
-    if (!digitMatch) {
+    const slotDigits = extractSlotDigits(plateInput);
+    if (!slotDigits) {
       setErrorMsg('No se detectaron 3 dígitos numéricos (ej: AI 440 SA o ABC 123).');
       return;
     }
 
-    const slotNumber = parseInt(digitMatch[0], 10);
+    const slotNumber = parseInt(slotDigits, 10);
 
     // Validación según el Issue #4: si viene de un casillero específico, la patente leída debe coincidir
     if (targetSlot !== null && targetSlot !== undefined && slotNumber !== targetSlot) {
-      const formattedTarget = targetSlot.toString().padStart(3, '0');
-      setErrorMsg(`La patente ingresada/leída (#${digitMatch[0]}) no corresponde al casillero #${formattedTarget} seleccionado. Carga anulada.`);
+      const formattedTarget = padSlot(targetSlot);
+      setErrorMsg(`La patente ingresada/leída (#${slotDigits}) no corresponde al casillero #${formattedTarget} seleccionado. Carga anulada.`);
       return;
     }
     const mockImage = imagePreview || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=500&auto=format&fit=crop&q=60';
 
     // Issue #6: exige sesión previa para cargar fotos (también validado en backend)
-    const jwtToken = localStorage.getItem('jwt_token');
-    if (!jwtToken) {
+    if (!getToken()) {
       setErrorMsg('Debes iniciar sesión antes de cargar fotos al álbum.');
       return;
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
       // Issue #12: si se está viendo un álbum compartido, la figurita va a ese álbum
-      const stickerUrl = albumId ? `${apiUrl}/album/stickers?albumId=${albumId}` : `${apiUrl}/album/stickers`;
-      const response = await fetch(stickerUrl, {
+      const response = await apiFetch(withAlbum('/album/stickers', albumId), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${jwtToken}`,
-        },
-        body: JSON.stringify({
-          plateText: plateInput,
-          imageUrl: mockImage,
-        }),
+        json: { plateText: plateInput, imageUrl: mockImage },
       });
 
       if (response.status === 401) {
@@ -185,12 +171,22 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       }
 
       if (response.status === 409) {
-        const errData = await response.json();
+        const errData = await readJson(response);
         setErrorMsg(errData.error || `El casillero #${slotNumber} ya posee una figurita pegada.`);
+        return;
+      }
+
+      // Cualquier otro rechazo (formato/tamaño de imagen, acceso revocado,
+      // patente inválida...) se informa en vez de pegar la figurita solo en la UI
+      if (!response.ok) {
+        const errData = await readJson(response);
+        setErrorMsg(errData.error || 'No se pudo guardar la figurita. Reintenta en unos segundos.');
         return;
       }
     } catch (err) {
       console.error('Error al guardar en PostgreSQL:', err);
+      setErrorMsg('No se pudo guardar la figurita. Reintenta en unos segundos.');
+      return;
     }
 
     onStickerAdded(slotNumber, plateInput.toUpperCase(), mockImage);
@@ -198,11 +194,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay" onClick={handleClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px' }}>
+    <Modal onClose={handleClose} style={{ maxWidth: '560px' }}>
         <div className="modal-header">
           <h2 className="modal-title">{t.uploadButton}</h2>
-          <button className="close-btn" onClick={handleClose}>
+          <button className="close-btn" onClick={handleClose} aria-label={t.close}>
             <X size={20} />
           </button>
         </div>
@@ -339,7 +334,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             </div>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
               {plateInput
-                ? <>Patente detectada automáticamente. Casillero asignado: <strong>#{plateInput.match(/\d{3}/)?.[0] || '___'}</strong></>
+                ? <>Patente detectada automáticamente. Casillero asignado: <strong>#{extractSlotDigits(plateInput) || '___'}</strong></>
                 : 'La patente se completa automáticamente al procesar la foto con OCR.'}
             </p>
           </div>
@@ -370,7 +365,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 };

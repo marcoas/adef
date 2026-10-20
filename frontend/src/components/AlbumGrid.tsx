@@ -14,25 +14,14 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, Sparkles, Lock, BookOpen, ArrowUp, ArrowLeftRight, CheckCircle2, CircleDashed, X, Trophy, LogOut } from 'lucide-react';
-import { getTranslation, Locale } from '../lib/i18n';
-import { StickerData } from './StickerModal';
+import { useLocale } from '../lib/LocaleContext';
+import { apiJson, errorMessage } from '../lib/api';
+import { padSlot } from '../lib/format';
+import type { AlbumOption, StickerData, UserSession } from '../types/domain';
 import { QuickJumpBar } from './QuickJumpBar';
 import { RankingModal } from './RankingModal';
 
-export interface AlbumOption {
-  id: string;
-  title: string;
-  role: 'OWNER' | 'ASSOCIATE';
-}
-
-interface UserSession {
-  email: string;
-  name: string;
-  avatarUrl?: string;
-}
-
 interface AlbumGridProps {
-  locale: Locale;
   stickers: Record<number, StickerData>;
   onSlotClick: (slotNumber: number) => void;
   userSession: UserSession | null;
@@ -56,7 +45,6 @@ interface AlbumGridProps {
 const JUMP_GROUPS = Array.from({ length: 10 }, (_, i) => i * 100);
 
 export const AlbumGrid: React.FC<AlbumGridProps> = ({
-  locale,
   stickers,
   onSlotClick,
   userSession,
@@ -68,10 +56,9 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
   previewSlot,
   onOpenActivityLog,
 }) => {
-  const t = getTranslation(locale);
+  const { t } = useLocale();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'collected' | 'missing'>('all');
-  const [selectedAlbum, setSelectedAlbum] = useState<'own' | 'shared'>('own');
   const [showScrollTop, setShowScrollTop] = useState(false);
   // Issue #32: centena activa según la posición del scroll
   const [activeGroup, setActiveGroup] = useState<number | null>(null);
@@ -94,18 +81,11 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
     if (!activeAlbumId || activeAlbumRole !== 'ASSOCIATE') return;
     if (!window.confirm(t.leaveAlbumConfirm)) return;
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-      const jwtToken = localStorage.getItem('jwt_token');
-      const res = await fetch(`${apiUrl}/albums/${activeAlbumId}/leave`, {
-        method: 'DELETE',
-        headers: jwtToken ? { Authorization: `Bearer ${jwtToken}` } : {},
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Error');
+      await apiJson(`/albums/${activeAlbumId}/leave`, { method: 'DELETE' });
       alert(t.leaveAlbumSuccess);
       window.location.reload();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error al desvincularse.');
+      alert(errorMessage(err, 'Error al desvincularse.'));
     }
   };
 
@@ -123,12 +103,11 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
   };
 
   // Issue #7: sin sesión no existe "el álbum del usuario"; se limpian los filtros
-  // locales (búsqueda, filtro, álbum seleccionado) al cerrar sesión.
+  // locales (búsqueda y filtro) al cerrar sesión.
   useEffect(() => {
     if (!userSession) {
       setSearchTerm('');
       setFilterType('all');
-      setSelectedAlbum('own');
     }
   }, [userSession]);
 
@@ -145,7 +124,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
   // Filtrado de casilleros
   const filteredSlots = useMemo(() => {
     return slots.filter((slot) => {
-      const formattedNumber = slot.toString().padStart(3, '0');
+      const formattedNumber = padSlot(slot);
       const sticker = stickers[slot];
 
       // Filtro por búsqueda de texto/número
@@ -371,11 +350,9 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                 onChange={(e) => {
                   const value = e.target.value;
                   if (value === 'own') {
-                    setSelectedAlbum('own');
                     const own = albums.find((a) => a.role === 'OWNER');
                     if (own && onChangeAlbum) onChangeAlbum(own.id);
                   } else {
-                    setSelectedAlbum('shared');
                     if (onChangeAlbum) onChangeAlbum(value);
                   }
                 }}
@@ -538,7 +515,6 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
       <RankingModal
         isOpen={isRankingOpen}
         onClose={() => setIsRankingOpen(false)}
-        locale={locale}
         albumId={activeAlbumId}
         albumTitle={albums.find((a) => a.id === activeAlbumId)?.title}
       />
@@ -549,16 +525,14 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
         <>
           <span className="quick-jump-desktop">
             <QuickJumpBar
-              locale={locale}
-              groups={JUMP_GROUPS}
+                    groups={JUMP_GROUPS}
               activeGroup={activeGroup}
               onJump={jumpToGroup}
             />
           </span>
           <span className="quick-jump-mobile">
             <QuickJumpBar
-              locale={locale}
-              groups={JUMP_GROUPS}
+                    groups={JUMP_GROUPS}
               activeGroup={activeGroup}
               onJump={jumpToGroup}
               collapsed
@@ -571,7 +545,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
       <div className="grid-container">
         {filteredSlots.map((slot) => {
           const sticker = stickers[slot];
-          const formattedSlot = slot.toString().padStart(3, '0');
+          const formattedSlot = padSlot(slot);
 
           return (
             <div 

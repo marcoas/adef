@@ -7,26 +7,22 @@
 //   GET    /api/admin/users/:id/album    → ver el álbum de otro usuario
 //   PATCH  /api/admin/users/:id          → isAdmin y/o status (ACTIVE/RESTRICTED)
 //   DELETE /api/admin/users/:id          → cancelación total del usuario
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X, ShieldCheck, LayoutDashboard, Users, Search, AlertCircle, Loader2,
   Ban, CheckCircle2, Trash2, Eye, ChevronLeft, User as UserIcon, Mail,
   Activity, KeyRound, UserX, BookOpen, Image as ImageIcon, Gauge,
 } from 'lucide-react';
-import { getTranslation, Locale } from '../lib/i18n';
+import { useLocale } from '../lib/LocaleContext';
+import { apiFetch, apiJson, errorMessage } from '../lib/api';
+import { padSlot } from '../lib/format';
+import type { ActionMessage, AlbumMember as AdminMember, StickerAction } from '../types/domain';
+import { Modal } from './Modal';
 
 interface AdminPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  locale: Locale;
   currentUserId?: string | null;
-}
-
-interface AdminMember {
-  id: string;
-  role: string;
-  joinedAt: string;
-  user: { id: string; name: string; email: string; avatarUrl?: string | null };
 }
 
 interface AdminOwnedAlbum {
@@ -80,7 +76,7 @@ interface RecentActivity {
   id: string;
   userName: string;
   slotNumber: number;
-  action: 'PASTE' | 'UNPASTE';
+  action: StickerAction;
   createdAt: string;
   album: { title: string } | null;
 }
@@ -108,23 +104,16 @@ interface UserAlbumData {
   }[];
 }
 
-const padSlot = (n: number) => String(n).padStart(3, '0');
-
-export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, locale, currentUserId }) => {
-  const t = getTranslation(locale);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, currentUserId }) => {
+  const { t } = useLocale();
   const [tab, setTab] = useState<'dashboard' | 'users'>('dashboard');
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [actionMsg, setActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [actionMsg, setActionMsg] = useState<ActionMessage | null>(null);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [albumView, setAlbumView] = useState<{ userId: string; data: UserAlbumData | null; loading: boolean } | null>(null);
-
-  const authHeaders = useCallback((): Record<string, string> => ({
-    Authorization: `Bearer ${localStorage.getItem('jwt_token') || ''}`,
-  }), []);
 
   // Carga dashboard + usuarios cada vez que se abre el panel (datos frescos)
   useEffect(() => {
@@ -138,8 +127,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, locale,
     const run = async () => {
       try {
         const [dashRes, usersRes] = await Promise.all([
-          fetch(`${apiUrl}/admin/dashboard`, { headers: authHeaders() }),
-          fetch(`${apiUrl}/admin/users`, { headers: authHeaders() }),
+          apiFetch('/admin/dashboard'),
+          apiFetch('/admin/users'),
         ]);
         if (dashRes.ok) setDashboard((await dashRes.json()) as DashboardData);
         if (usersRes.ok) {
@@ -165,7 +154,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, locale,
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${apiUrl}/admin/users`, { headers: authHeaders() });
+        const res = await apiFetch('/admin/users');
         if (res.ok && !cancelled) {
           const data = (await res.json()) as { users: AdminUser[] };
           setUsers(data.users || []);
@@ -188,13 +177,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, locale,
     setBusyUserId(userId);
     setActionMsg(null);
     try {
-      const res = await fetch(`${apiUrl}/admin/users/${userId}`, {
-        method: 'PATCH',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) throw new Error(body.error || t.adminActionError);
+      await apiJson(`/admin/users/${userId}`, { method: 'PATCH', json: payload }, t.adminActionError);
       setUsers((prev) => prev.map((u) => (u.id === userId
         ? {
           ...u,
@@ -204,7 +187,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, locale,
         : u)));
       setActionMsg({ type: 'success', text: successText });
     } catch (err) {
-      setActionMsg({ type: 'error', text: err instanceof Error ? err.message : t.adminActionError });
+      setActionMsg({ type: 'error', text: errorMessage(err, t.adminActionError) });
     } finally {
       setBusyUserId(null);
     }
@@ -217,13 +200,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, locale,
     setBusyUserId(user.id);
     setActionMsg(null);
     try {
-      const res = await fetch(`${apiUrl}/admin/users/${user.id}`, { method: 'DELETE', headers: authHeaders() });
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) throw new Error(body.error || t.adminActionError);
+      await apiJson(`/admin/users/${user.id}`, { method: 'DELETE' }, t.adminActionError);
       setUsers((prev) => prev.filter((u) => u.id !== user.id));
       setActionMsg({ type: 'success', text: t.adminDeleteSuccess });
     } catch (err) {
-      setActionMsg({ type: 'error', text: err instanceof Error ? err.message : t.adminActionError });
+      setActionMsg({ type: 'error', text: errorMessage(err, t.adminActionError) });
     } finally {
       setBusyUserId(null);
     }
@@ -234,16 +215,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, locale,
     setActionMsg(null);
     setAlbumView({ userId, data: null, loading: true });
     try {
-      const res = await fetch(`${apiUrl}/admin/users/${userId}/album`, { headers: authHeaders() });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error || t.adminActionError);
-      }
-      const data = (await res.json()) as UserAlbumData;
+      const data = await apiJson<UserAlbumData>(`/admin/users/${userId}/album`, undefined, t.adminActionError);
       setAlbumView({ userId, data, loading: false });
     } catch (err) {
       setAlbumView(null);
-      setActionMsg({ type: 'error', text: err instanceof Error ? err.message : t.adminActionError });
+      setActionMsg({ type: 'error', text: errorMessage(err, t.adminActionError) });
     }
   };
 
@@ -301,8 +277,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, locale,
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '980px', width: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+    <Modal onClose={onClose} style={{ maxWidth: '980px', width: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
         <div className="modal-header" style={{ marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
             <div style={{ background: 'rgba(0, 242, 254, 0.15)', padding: '6px', borderRadius: 'var(--radius-sm)', color: 'var(--accent-cyan)' }}>
@@ -760,7 +735,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, locale,
             </>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };

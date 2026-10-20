@@ -10,24 +10,18 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Calendar, User, CheckCircle2, Trash2 } from 'lucide-react';
-import { getTranslation, Locale } from '../lib/i18n';
+import { useLocale } from '../lib/LocaleContext';
+import { apiFetch, readJson, withAlbum } from '../lib/api';
+import { padSlot } from '../lib/format';
+import type { StickerData } from '../types/domain';
 import { ConfirmDialog } from './ConfirmDialog';
-
-export interface StickerData {
-  slotNumber: number;
-  rawPlate: string;
-  imageUrl: string;
-  thumbnailUrl?: string | null;
-  capturedAt: string;
-  capturedBy?: string;
-}
+import { Modal } from './Modal';
 
 interface StickerModalProps {
   slotNumber: number | null;
   sticker: StickerData | null;
   isOpen: boolean;
   onClose: () => void;
-  locale: Locale;
   onStickerDeleted?: (slotNumber: number) => void;
   isOwner?: boolean;
   // Issue #12: álbum activo (compartido) para eliminar figuritas
@@ -39,12 +33,11 @@ export const StickerModal: React.FC<StickerModalProps> = ({
   sticker,
   isOpen,
   onClose,
-  locale,
   onStickerDeleted,
   isOwner = true,
   albumId = null,
 }) => {
-  const t = getTranslation(locale);
+  const { t } = useLocale();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPeeling, setIsPeeling] = useState(false);
   // Issue #31: confirmación de eliminación mediante popup propio (sin window.confirm/alert)
@@ -64,7 +57,7 @@ export const StickerModal: React.FC<StickerModalProps> = ({
 
   if (!isOpen || slotNumber === null) return null;
 
-  const formattedSlot = slotNumber.toString().padStart(3, '0');
+  const formattedSlot = padSlot(slotNumber);
 
   // Issue #31: elimina la foto tras confirmar en el popup propio
   const handleConfirmDelete = async () => {
@@ -72,16 +65,10 @@ export const StickerModal: React.FC<StickerModalProps> = ({
     setDeleteError(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-      const jwtToken = localStorage.getItem('jwt_token');
-      const res = await fetch(
-        // Issue #12: indicar el álbum cuando es un álbum compartido
-        `${apiUrl}/album/stickers/${slotNumber}${albumId ? `?albumId=${albumId}` : ''}`,
-        {
-          method: 'DELETE',
-          headers: jwtToken ? { Authorization: `Bearer ${jwtToken}` } : {},
-        }
-      );
+      // Issue #12: indicar el álbum cuando es un álbum compartido
+      const res = await apiFetch(withAlbum(`/album/stickers/${slotNumber}`, albumId), {
+        method: 'DELETE',
+      });
 
       if (res.status === 401) {
         setDeleteError(t.sessionExpired);
@@ -92,7 +79,7 @@ export const StickerModal: React.FC<StickerModalProps> = ({
         return;
       }
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+        const data = await readJson(res);
         setDeleteError(data.error || 'No se pudo eliminar la figurita.');
         return;
       }
@@ -116,8 +103,7 @@ export const StickerModal: React.FC<StickerModalProps> = ({
 
   return (
     <>
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+      <Modal onClose={onClose}>
           <div className="modal-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <span style={{ 
@@ -132,7 +118,7 @@ export const StickerModal: React.FC<StickerModalProps> = ({
                 {sticker ? `Patente ${sticker.rawPlate}` : t.emptySlot}
               </h2>
             </div>
-            <button className="close-btn" onClick={onClose}>
+            <button className="close-btn" onClick={onClose} aria-label={t.close}>
               <X size={20} />
             </button>
           </div>
@@ -199,8 +185,7 @@ export const StickerModal: React.FC<StickerModalProps> = ({
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </Modal>
 
       {/* Issue #23: Visualización a tamaño real con botón claro para volver al álbum / cerrar */}
       {isFullscreen && sticker && (
@@ -240,7 +225,6 @@ export const StickerModal: React.FC<StickerModalProps> = ({
       {/* Issue #31: popup de confirmación propio, con la estética del sitio */}
       <ConfirmDialog
         isOpen={isConfirmOpen}
-        locale={locale}
         title={t.confirmDeleteTitle}
         message={t.confirmDeleteMessage}
         highlight={`#${formattedSlot}`}
