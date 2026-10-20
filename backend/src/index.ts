@@ -31,13 +31,21 @@ import { createWorker } from 'tesseract.js';
 import { extractPlate } from './utils/plateExtractor';
 import { recognizePlateALPR } from './services/alprService';
 import { storeImage, deleteStoredImages, UPLOADS_DIR } from './services/images';
+import { verifyGoogleAccessToken } from './services/googleAuth';
 
 dotenv.config();
 
 const prisma = new PrismaClient();
 const app = express();
 const PORT = process.env.PORT || 4000;
+// En producción el secreto es obligatorio: con un valor por defecto conocido
+// cualquiera podría firmar JWT válidos. En desarrollo se usa uno fijo.
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('JWT_SECRET es obligatorio en producción.');
+}
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_patentes_2026_change_me';
+// Client id de Google OAuth: el login solo acepta tokens emitidos para él
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 // Issue #10: límites de carga de imágenes (solo JPG/PNG y tamaño máximo)
 const MAX_IMAGE_SIZE_MB = parseInt(process.env.MAX_IMAGE_SIZE_MB || '5', 10);
 const ALLOWED_IMAGE_MIME = ['image/jpeg', 'image/png'];
@@ -292,28 +300,25 @@ async function notifyAlbumOwner(params: {
 // -------------------------------------------------------------
 app.post('/api/auth/login', async (req: Request, res: Response) => {
   try {
-    const { email, name, avatarUrl, idToken, authProvider } = req.body;
-    let userEmail = email;
-    let userName = name;
-    let userAvatar = avatarUrl;
-
-    // Si viene idToken de Google OAuth, extraer información de usuario del token
-    if (idToken) {
-      try {
-        const decoded: any = jwt.decode(idToken);
-        if (decoded && decoded.email) {
-          userEmail = decoded.email;
-          userName = decoded.name || decoded.given_name || userEmail.split('@')[0];
-          userAvatar = decoded.picture || avatarUrl;
-        }
-      } catch (err) {
-        console.warn('Error al decodificar idToken de Google:', err);
-      }
+    // La identidad SIEMPRE sale del access token verificado con Google; nunca
+    // se confía en email/nombre enviados por el cliente (permitiría suplantar
+    // a cualquier usuario).
+    const { accessToken } = req.body ?? {};
+    if (!accessToken || typeof accessToken !== 'string') {
+      return res.status(400).json({ error: 'Se requiere el token de acceso de Google para iniciar sesión' });
+    }
+    if (!GOOGLE_CLIENT_ID) {
+      console.error('GOOGLE_CLIENT_ID no está configurado en el backend.');
+      return res.status(500).json({ error: 'El login con Google no está configurado en el servidor' });
     }
 
-    if (!userEmail) {
-      return res.status(400).json({ error: 'Se requiere un email válido para iniciar sesión' });
+    const profile = await verifyGoogleAccessToken(accessToken, GOOGLE_CLIENT_ID);
+    if (!profile) {
+      return res.status(401).json({ error: 'No se pudo verificar tu cuenta de Google. Iniciá sesión nuevamente.' });
     }
+    const userEmail = profile.email;
+    const userName = profile.name;
+    const userAvatar = profile.picture;
 
     let user = await prisma.user.findUnique({ where: { email: userEmail } });
     if (!user) {
@@ -321,7 +326,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
         data: {
           email: userEmail,
           name: userName || userEmail.split('@')[0],
-          authProvider: authProvider || 'google',
+          authProvider: 'google',
           avatarUrl: userAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
         },
       });

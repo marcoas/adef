@@ -15,7 +15,7 @@ Todo el backend vive en [`backend/src/index.ts`](../backend/src/index.ts) (Expre
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `POST` | `/api/auth/login` | — | Login con `email` + `name` (+ `avatarUrl`, `idToken`, `authProvider`). Crea el usuario y su álbum si no existen, actualiza `lastLoginAt`, siembra admins desde `ADMIN_EMAILS` (#41) y devuelve `{ token, user }`. Rechaza cuentas `RESTRICTED` con `403`. |
+| `POST` | `/api/auth/login` | — | Login con Google: body `{ accessToken }` (token de acceso de Google Identity Services). El backend lo verifica con Google (`tokeninfo`: emitido para `GOOGLE_CLIENT_ID`, email verificado) y toma email, nombre y foto del perfil de Google; nunca de datos enviados por el cliente. Crea el usuario y su álbum si no existen, actualiza `lastLoginAt`, siembra admins desde `ADMIN_EMAILS` (#41) y devuelve `{ token, user }`. Errores: `400` sin token, `401` token inválido o de otra app, `403` cuenta `RESTRICTED`, `500` si falta `GOOGLE_CLIENT_ID`. |
 | `GET` | `/api/auth/me` | ✅ | Devuelve la sesión actual leída de la BD (incluye `isAdmin`, `status`, `lastLoginAt`) para refrescar sesiones guardadas (#41). |
 | `GET` | `/api/users/me/preferences` | ✅ | Preferencia `notifyOnAlbumActivity` (#34). |
 | `PUT` | `/api/users/me/preferences` | ✅ | Actualiza `notifyOnAlbumActivity` (`true`/`false`). |
