@@ -11,6 +11,7 @@ import helmet from 'helmet';
 import fs from 'fs';
 import { FRONTEND_URL } from './config';
 import { trackApiUsage } from './middleware/apiUsage';
+import { generalLimiter } from './middleware/rateLimit';
 import { UPLOADS_DIR } from './services/images';
 import authRoutes from './routes/auth';
 import plateRoutes from './routes/plates';
@@ -32,8 +33,13 @@ app.use(cors({
   origin: FRONTEND_URL,
   credentials: true,
 }));
-app.use(express.json({ limit: '25mb' }));
+// El body se limita a 10 MB: suficiente para una foto de 5 MB en base64
+// (~6.8 MB) y bastante menos que los 25 MB previos, que facilitaban agotar
+// memoria. La validación fina de tamaño de imagen vive en albumService (#10).
+app.use(express.json({ limit: '10mb' }));
 
+// Límite de tasa general por IP (las rutas sensibles suman uno más estricto)
+app.use('/api', generalLimiter);
 app.use('/api', trackApiUsage);
 
 // Issue #11: servir archivos estáticos con caché de larga duración.

@@ -6,10 +6,15 @@ import { extractPlate } from '../utils/plateExtractor';
 import { recognizePlateALPR } from '../services/alprService';
 import { recordExternalApiCall } from '../services/externalApiUsage';
 import { asyncHandler } from '../lib/asyncHandler';
+import { requireAuth } from '../middleware/auth';
+import { strictLimiter } from '../middleware/rateLimit';
 
 const router = Router();
 
-router.post('/plates/ocr', asyncHandler(async (req, res) => {
+// Requiere sesión: el OCR consume cuota de la API externa (Plate Recognizer)
+// y CPU de Tesseract. Sin auth, un anónimo podía agotar la cuota o generar
+// carga. El frontend solo lo usa estando logueado. Además se limita por IP.
+router.post('/plates/ocr', strictLimiter, requireAuth, asyncHandler(async (req, res) => {
   const { imageBase64 } = req.body;
   if (!imageBase64) {
     return res.status(400).json({ error: 'Se requiere la imagen en base64 para el OCR' });
@@ -24,7 +29,7 @@ router.post('/plates/ocr', asyncHandler(async (req, res) => {
 }, { log: 'Error en procesamiento OCR / ALPR:', error: 'Error al procesar la imagen con OCR/ALPR' }));
 
 // Endpoint de prueba de Regex
-router.post('/plates/parse', asyncHandler((req, res) => {
+router.post('/plates/parse', strictLimiter, requireAuth, asyncHandler((req, res) => {
   const { text } = req.body;
   if (!text || typeof text !== 'string') {
     return res.status(400).json({ error: 'Se requiere el parámetro "text"' });
