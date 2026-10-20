@@ -28,6 +28,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      # Stage de desarrollo (ts-node-dev con recarga); producción usa el
+      # stage "production" (ver docker-compose.prod.yml y render.yaml)
+      target: dev
     container_name: patentes_backend
     restart: always
     ports:
@@ -67,6 +70,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      # Stage de desarrollo (next dev); producción usa el stage "production"
+      target: dev
     container_name: patentes_frontend
     restart: always
     ports:

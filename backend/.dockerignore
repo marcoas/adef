@@ -1,0 +1,10 @@
+# Archivos que no entran al contexto de build de Docker del backend
+node_modules
+dist
+npm-debug.log*
+.env
+.env.*
+# Fotos del proveedor "local" en desarrollo (no van a la imagen)
+src/uploads
+Dockerfile
+.dockerignore

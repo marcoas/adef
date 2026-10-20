@@ -1,0 +1,110 @@
+# =============================================================
+# Producción en una sola VM (Oracle Cloud Always Free, ARM64 A1 o x86)
+# Guía: docs/DEPLOY_GUIDE.md (sección "Alternativa: Oracle Cloud")
+#
+# Uso (en la VM, con el .env de producción en la raíz del repo):
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Servicios:
+#   caddy     Único puerto expuesto (80/443). HTTPS automático con Let's
+#             Encrypt para ${DOMAIN}. /api y /uploads -> backend; resto -> web.
+#   postgres  Base de datos (sin puertos publicados: solo red interna).
+#   migrate   Pre-deploy: `prisma migrate deploy` y termina. Corre una vez
+#             por `up`; el backend no arranca si falla. Los reinicios del
+#             backend NO vuelven a migrar.
+#   backend   Imagen "production" del backend (node dist/index.js).
+#   frontend  Imagen "production" del frontend (next start).
+# =============================================================
+
+x-backend-env: &backend-env
+  NODE_ENV: production
+  PORT: 4000
+  DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?Definir DOMAIN en .env (ej. album.midominio.com)}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Definir POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Definir POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?Definir POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: ./backend
+      target: migrate
+    restart: "no"
+    environment: *backend-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ./backend
+      target: production
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      JWT_SECRET: ${JWT_SECRET:?Definir JWT_SECRET (openssl rand -base64 32)}
+      FRONTEND_URL: https://${DOMAIN}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Definir GOOGLE_CLIENT_ID}
+      PLATE_RECOGNIZER_TOKEN: ${PLATE_RECOGNIZER_TOKEN:?Definir PLATE_RECOGNIZER_TOKEN}
+      PLATE_RECOGNIZER_MONTHLY_QUOTA: ${PLATE_RECOGNIZER_MONTHLY_QUOTA:-2500}
+      MAX_IMAGE_SIZE_MB: ${MAX_IMAGE_SIZE_MB:-5}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      IMAGE_PROVIDER: ${IMAGE_PROVIDER:-local}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      CLOUDINARY_FOLDER: ${CLOUDINARY_FOLDER:-album-patentes}
+    volumes:
+      # Fotos del proveedor "local" (persisten entre deploys)
+      - uploads:/app/dist/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+      # NEXT_PUBLIC_* se incrustan al compilar: cambiarlas requiere --build
+      args:
+        NEXT_PUBLIC_API_URL: https://${DOMAIN}/api
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+        NEXT_PUBLIC_DEFAULT_LOCALE: ${NEXT_PUBLIC_DEFAULT_LOCALE:-es}
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  uploads:
+  caddy_data:
+  caddy_config:
