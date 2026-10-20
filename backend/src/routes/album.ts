@@ -31,9 +31,12 @@ router.get('/album', requireAuth, asyncHandler(async (req, res) => {
   if (!context) return;
   const { album } = context;
 
+  // Del usuario que pegó cada figurita solo se usa el nombre (`capturedBy`
+  // en serializeSticker): traer el registro completo del usuario por cada una
+  // de hasta 1000 figuritas era tráfico de BD innecesario.
   const dbStickers = await prisma.sticker.findMany({
     where: { albumId: album.id },
-    include: { uploadedBy: true },
+    include: { uploadedBy: { select: { name: true } } },
   });
 
   const stickersMap: Record<number, ReturnType<typeof serializeSticker>> = {};
@@ -127,7 +130,7 @@ router.post('/album/stickers', requireAuth, asyncHandler(async (req, res) => {
         thumbnailUrl: storedImage?.thumbnailUrl || null,
         uploadedByUserId: user.id,
       },
-      include: { uploadedBy: true },
+      include: { uploadedBy: { select: { name: true } } },
     }),
     prisma.stickerActivity.create({
       data: {

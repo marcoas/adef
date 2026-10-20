@@ -13,3 +13,23 @@ export async function recordExternalApiCall(ok: boolean, provider = 'plate_recog
     console.error('No se pudo registrar el consumo de la API externa:', err);
   }
 }
+
+/** Primer instante del mes calendario de `now` (hora local del servidor). */
+export function startOfMonth(now = new Date()): Date {
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+// Issue #48: consumo del mes en curso (llamadas totales y exitosas). Lo usan
+// el panel de administración y el corte por cuota del OCR (alprService), de
+// modo que ambos cuentan exactamente lo mismo contra la cuota mensual.
+export async function getMonthlyExternalApiUsage(
+  provider = 'plate_recognizer',
+  now = new Date(),
+): Promise<{ total: number; ok: number }> {
+  const since = startOfMonth(now);
+  const [total, ok] = await Promise.all([
+    prisma.externalApiCall.count({ where: { provider, createdAt: { gte: since } } }),
+    prisma.externalApiCall.count({ where: { provider, createdAt: { gte: since }, ok: true } }),
+  ]);
+  return { total, ok };
+}

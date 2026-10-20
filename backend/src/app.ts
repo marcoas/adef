@@ -8,8 +8,9 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import fs from 'fs';
-import { FRONTEND_URL } from './config';
+import { FRONTEND_URL, TRUST_PROXY } from './config';
 import { trackApiUsage } from './middleware/apiUsage';
 import { generalLimiter } from './middleware/rateLimit';
 import { UPLOADS_DIR } from './services/images';
@@ -24,6 +25,10 @@ import healthRoutes from './routes/health';
 
 export const app = express();
 
+// Detrás de un proxy inverso (Render, Caddy, nginx) `req.ip` debe ser la IP
+// real del cliente para que el rate limit por IP funcione (ver config.ts).
+app.set('trust proxy', TRUST_PROXY);
+
 // Security & Middleware
 app.use(helmet({
   // Issue #11: las imágenes del álbum se sirven desde el backend
@@ -37,6 +42,11 @@ app.use(cors({
 // (~6.8 MB) y bastante menos que los 25 MB previos, que facilitaban agotar
 // memoria. La validación fina de tamaño de imagen vive en albumService (#10).
 app.use(express.json({ limit: '10mb' }));
+
+// Compresión gzip de las respuestas: GET /album devuelve hasta 1000
+// figuritas en JSON (muy repetitivo) y se reduce varias veces su tamaño.
+// `compression` solo comprime tipos compresibles y respuestas > 1 KB.
+app.use(compression());
 
 // Límite de tasa general por IP (las rutas sensibles suman uno más estricto)
 app.use('/api', generalLimiter);
