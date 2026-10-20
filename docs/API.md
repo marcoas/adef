@@ -26,7 +26,7 @@ Las rutas viven en [`backend/src/routes/`](../backend/src/routes/), un archivo p
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `POST` | `/api/plates/ocr` | ✅ | Recibe `{ imageBase64 }` y devuelve la patente detectada. Usa Plate Recognizer (si hay token) con fallback a Tesseract.js; cada llamada real se registra en `external_api_calls` (#48). |
+| `POST` | `/api/plates/ocr` | ✅ | Recibe `{ imageBase64 }` y devuelve la patente detectada. Delegado a Plate Recognizer (requiere `PLATE_RECOGNIZER_TOKEN`; sin token o si la API falla responde `503`); cada llamada real se registra en `external_api_calls` (#48). |
 | `POST` | `/api/plates/parse` | ✅ | Recibe `{ text }` y aplica las expresiones regulares de patente (`AAA 000` / `AA 000 AA`) devolviendo el casillero (`extractPlate`). |
 
 ## Álbum y figuritas
