@@ -91,7 +91,10 @@ npm run prisma:generate       # refresca los tipos del cliente
 - **TypeScript estricto** en ambas capas; sin `any` salvo datos externos justificados.
 - **Comentarios inline:** todo archivo comienza con un JSDoc de cabecera que explica su responsabilidad; los bloques no obvios llevan comentario. Cuando una línea/función corresponde a un issue, se referencia con `// Issue #NN:` (patrón usado en todo el repo).
 - **Documentación Markdown:** si una decisión de diseño o un endpoint cambia, actualizar el doc correspondiente en `docs/` en el mismo commit.
-- **i18n:** toda cadena visible en UI se agrega en `frontend/src/lib/i18n.ts` con traducción **ES y EN**; no hardcodear textos en los componentes.
+- **i18n:** toda cadena visible en UI se agrega en `frontend/src/lib/i18n.ts` con traducción **ES y EN** y se lee con `const { t } = useLocale()`; no hardcodear textos en los componentes.
+- **Backend:** rutas nuevas en `backend/src/routes/<dominio>.ts` envueltas en `asyncHandler`; la lógica reutilizable va en `services/`, la configuración en `config.ts`.
+- **Frontend:** llamar al backend solo con `lib/api.ts` (nunca `fetch` directo ni leer `localStorage` para el token) y declarar tipos compartidos en `types/domain.ts`.
+- **Chequeos:** `npm run typecheck` (backend) y `npm run lint` + `npm run build` (frontend) antes de commitear.
 - **Estilos:** variables CSS globales (`--bg-card`, `--border-color`, etc.) y clases utilitarias existentes (`btn-primary`, `btn-secondary`, `btn-danger`, `modal-overlay`...); evitar estilos inline salvo dinamismo.
 - **Popups de confirmación:** usar `ConfirmDialog` (Issue #31), nunca `window.confirm`.
 

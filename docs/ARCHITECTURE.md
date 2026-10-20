@@ -32,11 +32,22 @@ adef/
 │   └── DEVELOPMENT.md          # Guía de desarrollo
 ├── backend/
 │   ├── src/
-│   │   ├── index.ts            # App Express: middlewares + todas las rutas
+│   │   ├── index.ts            # Punto de entrada: solo app.listen()
+│   │   ├── app.ts              # App Express: middlewares globales + routers
+│   │   ├── config.ts           # Variables de entorno
+│   │   ├── db.ts               # PrismaClient compartido
+│   │   ├── types.ts            # AuthedRequest + helpers authUserId/authUser
+│   │   ├── lib/asyncHandler.ts # try/catch + 500 común a las rutas
+│   │   ├── middleware/         # auth.ts (requireAuth/requireAdmin), apiUsage.ts
+│   │   ├── routes/             # Un Router por dominio (auth, plates, album,
+│   │   │                       #   invites, notifications, users, admin, health)
 │   │   ├── services/
+│   │   │   ├── albumService.ts        # Acceso al álbum, serialización, validación de imagen
+│   │   │   ├── notificationService.ts # Avisos al dueño del álbum (#34)
+│   │   │   ├── accountService.ts      # Baja de cuenta en cascada (#41/#54)
+│   │   │   ├── externalApiUsage.ts    # Registro de llamadas a APIs externas (#48)
 │   │   │   ├── alprService.ts  # OCR: Plate Recognizer + fallback Tesseract
-│   │   │   ├── images/         # Fachada de proveedores (#35): local/cloudinary
-│   │   │   └── imageStorage.ts # LEGADO (no usar)
+│   │   │   └── images/         # Fachada de proveedores (#35): local/cloudinary
 │   │   └── utils/
 │   │       └── plateExtractor.ts  # Regex de patente → casillero 000-999
 │   └── prisma/
@@ -46,18 +57,23 @@ adef/
     └── src/
         ├── app/                # App Router: page.tsx, layout.tsx, invite/[token]
         ├── components/         # Componentes React (ver §3)
-        ├── lib/                # i18n.ts (ES/EN), theme.ts
+        ├── lib/                # api.ts, session.ts, LocaleContext.tsx, format.ts,
+        │                       #   i18n.ts (ES/EN), theme.ts
+        ├── types/domain.ts     # Tipos de dominio compartidos
         └── styles/             # globals.css (diseño + variables CSS)
 ```
 
 ## 3. Capas y Componentes
 
-### Backend (`backend/src/index.ts`)
+### Backend (`backend/src/`)
 
-- **Middlewares:** `helmet` (headers de seguridad), `cors`, `express.json()` y servido estático de `/uploads`.
-- **Autenticación:** JWT (`jsonwebtoken`, 7 días). `requireAuth` valida el token, carga el usuario de la BD y bloquea cuentas `RESTRICTED` (#41); `requireAdmin` exige `isAdmin`.
-- **Rutas:** agrupadas por dominio (auth, álbum/figuritas, invitaciones, notificaciones, ranking, administración). La referencia completa está en [`API.md`](API.md).
+- **Middlewares (`app.ts`):** `helmet` (headers de seguridad), `cors`, `express.json()`, contador de consumo de la API (`middleware/apiUsage.ts`) y servido estático de `/uploads`.
+- **Autenticación (`middleware/auth.ts`):** JWT (`jsonwebtoken`, 7 días). `requireAuth` valida el token, carga el usuario de la BD y bloquea cuentas `RESTRICTED` (#41); `requireAdmin` exige `isAdmin`.
+- **Rutas (`routes/`):** un `Router` por dominio (auth, plates, álbum/figuritas/ranking, invitaciones/miembros, notificaciones, usuario, administración, health), montados bajo `/api` en `app.ts`. Cada handler se envuelve con `asyncHandler`, que loguea y responde 500 ante errores no controlados. La referencia completa está en [`API.md`](API.md).
+- **Para sumar un dominio:** crear `routes/<dominio>.ts`, poner la lógica reutilizable en `services/` y montarlo en `app.ts`.
 - **Dominio auxiliar:**
+  - `services/albumService.ts` — `getOrCreateUserAlbum`, `requireOwnAlbum`, `resolveAccessibleAlbum` (álbum propio o compartido #8/#12/#37), `serializeSticker` y `validateImageInput` (#10).
+  - `services/notificationService.ts`, `services/accountService.ts`, `services/externalApiUsage.ts` — avisos (#34), baja de cuentas (#41/#54) y consumo de APIs externas (#48).
   - `utils/plateExtractor.ts` — validación de formatos de patente y cálculo del casillero.
   - `services/alprService.ts` — reconocimiento ALPR con fallback OCR (#48 registra el consumo).
   - `services/images/` — fachada `storeImage` / `deleteStoredImages` con proveedores *local* y *cloudinary* (#35).
@@ -65,8 +81,10 @@ adef/
 ### Frontend (Next.js App Router)
 
 - **`app/page.tsx`** — orquestador único de estado (sesión, álbum activo, álbumes, modales).
-- **Componentes principales:** `AlbumGrid` (grilla 000-999 con filtros y controles), `Header` (acciones + menú de usuario), `UploadModal` (captura/OCR), `StickerModal` (detalle/despegar), `UserModal` (panel de usuario #15/#45 y autoeliminación #54), `AdminPanel` (#41), `InviteModal` / `InvitePage` (#12), `NotificationsBell` (#34), `ActivityLogModal` (#33), `RankingModal` (#40), `ConfirmDialog` (#31), `QuickJumpBar` (#32).
-- **Cross-cutting:** `lib/i18n.ts` (ES/EN, todas las cadenas visibles pasan por `getTranslation`), `lib/theme.ts` (tema claro/oscuro persistente #36/#43).
+- **Componentes principales:** `AlbumGrid` (grilla 000-999 con filtros y controles), `Header` (acciones + menú de usuario), `UploadModal` (captura/OCR), `StickerModal` (detalle/despegar), `UserModal` (panel de usuario #15/#45, invitaciones #12 y autoeliminación #54), `AdminPanel` (#41), `InvitePage` (#12), `NotificationsBell` (#34), `ActivityLogModal` (#33), `RankingModal` (#40), `ConfirmDialog` (#31), `QuickJumpBar` (#32) y `Modal` (contenedor común: overlay, tarjeta y cierre con Escape).
+- **Acceso al backend:** siempre vía `lib/api.ts` (`apiFetch` / `apiJson` / `withAlbum`), que agrega la URL base y el JWT y convierte las respuestas `{ error }` en `ApiError`. La sesión (JWT + usuario en localStorage) se maneja solo con `lib/session.ts`.
+- **Tipos:** las formas de datos compartidas viven en `types/domain.ts`.
+- **Cross-cutting:** `lib/LocaleContext.tsx` (`useLocale()` devuelve `locale`, `setLocale` y los textos `t` de `lib/i18n.ts`, ES/EN), `lib/theme.ts` (tema claro/oscuro persistente #36/#43), `lib/format.ts` (casilleros y fechas).
 
 ---
 

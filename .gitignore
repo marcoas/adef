@@ -9,6 +9,7 @@ build/
 .next/
 .next.bak/
 .next-verify/
+frontend/tmp/
 out/
 *.tsbuildinfo
 
@@ -31,7 +32,7 @@ postgres_data/
 tmp/
 
 # Imágenes almacenadas por el backend (Issue #11)
-backend/uploads/
+backend/src/uploads/
 
 # OS and IDE files
 .DS_Store

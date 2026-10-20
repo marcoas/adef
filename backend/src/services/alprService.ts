@@ -12,8 +12,8 @@ import { createWorker } from 'tesseract.js';
 import { extractPlate, PlateResult } from '../utils/plateExtractor';
 
 // Issue #48: callback opcional para registrar cada llamada real a una API
-// externa (Plate Recognizer). Vive en index.ts (donde está el PrismaClient)
-// y evita dependencia circular con la base de datos.
+// externa (Plate Recognizer). Se inyecta desde routes/plates.ts
+// (services/externalApiUsage.ts) para no acoplar este servicio a la BD.
 export interface ALPRDeps {
   recordExternalCall?: (ok: boolean) => void | Promise<void>;
 }
