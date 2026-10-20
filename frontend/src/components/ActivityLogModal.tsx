@@ -9,11 +9,16 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { History, Loader2, Plus, Undo2, X, AlertCircle } from 'lucide-react';
-import { getTranslation, Locale } from '../lib/i18n';
+import { useLocale } from '../lib/LocaleContext';
+import { apiFetch, readJson } from '../lib/api';
+import { dateLocale, padSlot } from '../lib/format';
+import { getToken } from '../lib/session';
+import type { StickerAction } from '../types/domain';
+import { Modal } from './Modal';
 
 interface ActivityItem {
   id: string;
-  action: 'PASTE' | 'UNPASTE';
+  action: StickerAction;
   slotNumber: number;
   rawPlate: string;
   userName: string;
@@ -23,12 +28,11 @@ interface ActivityItem {
 interface ActivityLogModalProps {
   isOpen: boolean;
   onClose: () => void;
-  locale: Locale;
   /** Issue #12: álbum activo (propio o compartido) */
   albumId?: string | null;
 }
 
-type ActivityFilter = 'all' | 'PASTE' | 'UNPASTE';
+type ActivityFilter = 'all' | StickerAction;
 
 /**
  * Issue #33: log histórico y cronológico de los movimientos del álbum
@@ -37,10 +41,9 @@ type ActivityFilter = 'all' | 'PASTE' | 'UNPASTE';
 export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
   isOpen,
   onClose,
-  locale,
   albumId = null,
 }) => {
-  const t = getTranslation(locale);
+  const { locale, t } = useLocale();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [albumTitle, setAlbumTitle] = useState<string>('');
   const [total, setTotal] = useState(0);
@@ -50,13 +53,11 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
   const sessionExpiredMsg = t.sessionExpired;
 
   const loadActivities = useCallback(
     async (targetPage: number, currentFilter: ActivityFilter, append: boolean) => {
-      const jwtToken = localStorage.getItem('jwt_token');
-      if (!jwtToken) return;
+      if (!getToken()) return;
 
       setIsLoading(true);
       setErrorMsg(null);
@@ -65,16 +66,14 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
         if (albumId) params.set('albumId', albumId);
         if (currentFilter !== 'all') params.set('action', currentFilter);
 
-        const res = await fetch(`${apiUrl}/album/activity?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${jwtToken}` },
-        });
+        const res = await apiFetch(`/album/activity?${params.toString()}`);
 
         if (res.status === 401) {
           setErrorMsg(sessionExpiredMsg);
           return;
         }
         if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
+          const data = await readJson(res);
           throw new Error(data.error || 'No se pudieron cargar los movimientos.');
         }
 
@@ -91,7 +90,7 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
         setIsLoading(false);
       }
     },
-    [apiUrl, albumId, sessionExpiredMsg],
+    [albumId, sessionExpiredMsg],
   );
 
   useEffect(() => {
@@ -108,7 +107,7 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
   };
 
   const formatDate = (iso: string) => {
-    return new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'es-AR', {
+    return new Date(iso).toLocaleString(dateLocale(locale), {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -120,12 +119,11 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div
-        className="modal-card activity-log-card"
-        onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '640px', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
-      >
+    <Modal
+      onClose={onClose}
+      className="modal-card activity-log-card"
+      style={{ maxWidth: '640px', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
+    >
         {/* Header */}
         <div className="modal-header" style={{ marginBottom: '0.85rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
@@ -196,7 +194,7 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
 
           {activities.map((activity) => {
             const isPaste = activity.action === 'PASTE';
-            const formattedSlot = activity.slotNumber.toString().padStart(3, '0');
+            const formattedSlot = padSlot(activity.slotNumber);
             return (
               <div key={activity.id} className={`activity-log-item ${isPaste ? 'paste' : 'unpaste'}`}>
                 <div className="activity-log-icon">
@@ -237,7 +235,6 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
             {t.close}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };

@@ -10,7 +10,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Trophy, Medal, Loader2 } from 'lucide-react';
-import { getTranslation, Locale } from '../lib/i18n';
+import { useLocale } from '../lib/LocaleContext';
+import { apiFetch } from '../lib/api';
+import { Modal } from './Modal';
 
 export interface RankingEntry {
   userId: string;
@@ -23,7 +25,6 @@ export interface RankingEntry {
 interface RankingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  locale: Locale;
   albumId: string | null;
   albumTitle?: string;
 }
@@ -35,11 +36,10 @@ interface RankingModalProps {
 export const RankingModal: React.FC<RankingModalProps> = ({
   isOpen,
   onClose,
-  locale,
   albumId,
   albumTitle,
 }) => {
-  const t = getTranslation(locale);
+  const { t } = useLocale();
   const [ranking, setRanking] = useState<RankingEntry[]>([]);
   const [memberCount, setMemberCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,11 +48,7 @@ export const RankingModal: React.FC<RankingModalProps> = ({
     if (!albumId) return;
     setIsLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-      const jwtToken = localStorage.getItem('jwt_token');
-      const res = await fetch(`${apiUrl}/albums/${albumId}/ranking`, {
-        headers: jwtToken ? { Authorization: `Bearer ${jwtToken}` } : {},
-      });
+      const res = await apiFetch(`/albums/${albumId}/ranking`);
       if (res.ok) {
         const data = await res.json();
         setRanking(data.ranking || []);
@@ -73,8 +69,7 @@ export const RankingModal: React.FC<RankingModalProps> = ({
   const max = ranking[0]?.count || 1;
 
   return (
-    <div className="ranking-overlay" onClick={onClose}>
-      <div className="ranking-modal" onClick={(e) => e.stopPropagation()}>
+    <Modal onClose={onClose} overlayClassName="ranking-overlay" className="ranking-modal">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.05rem', fontWeight: 800 }}>
             <Trophy size={18} style={{ color: 'var(--accent-amber)' }} />
@@ -111,7 +106,6 @@ export const RankingModal: React.FC<RankingModalProps> = ({
             </div>
           ))
         )}
-      </div>
-    </div>
+    </Modal>
   );
 };

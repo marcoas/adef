@@ -1,6 +1,6 @@
 # 📡 Referencia de la API REST (Backend)
 
-Todo el backend vive en [`backend/src/index.ts`](../backend/src/index.ts) (Express + Prisma sobre PostgreSQL). La API se sirve bajo el prefijo `/api` (por defecto `http://localhost:4000/api`).
+Las rutas viven en [`backend/src/routes/`](../backend/src/routes/), un archivo por dominio, montadas en [`backend/src/app.ts`](../backend/src/app.ts) (Express + Prisma sobre PostgreSQL). La API se sirve bajo el prefijo `/api` (por defecto `http://localhost:4000/api`).
 
 ## Convenciones generales
 

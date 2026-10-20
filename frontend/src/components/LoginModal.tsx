@@ -10,7 +10,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, LogIn, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
-import { getTranslation, Locale } from '../lib/i18n';
+import { useLocale } from '../lib/LocaleContext';
+import { apiFetch, readJson } from '../lib/api';
+import { saveSession } from '../lib/session';
+import type { UserSession } from '../types/domain';
+import { Modal } from './Modal';
 
 declare global {
   interface Window {
@@ -29,17 +33,15 @@ declare global {
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  locale: Locale;
-  onLoginSuccess: (user: { email: string; name: string; avatarUrl?: string }) => void;
+  onLoginSuccess: (user: UserSession) => void;
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({
   isOpen,
   onClose,
-  locale,
   onLoginSuccess,
 }) => {
-  const t = getTranslation(locale);
+  const { t } = useLocale();
   const [isLoading, setIsLoading] = useState(false);
   const [activeProvider, setActiveProvider] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -88,32 +90,25 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     avatarOverride?: string,
   ) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-      const res = await fetch(`${apiUrl}/auth/login`, {
+      const res = await apiFetch('/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        json: {
           email: defaultEmail,
           name: defaultName,
           avatarUrl:
             avatarOverride ||
             'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
           authProvider: 'google',
-        }),
+        },
       });
 
       if (!res.ok) {
         throw new Error('Error al autenticar con Google');
       }
 
-      const data = await res.json();
-      if (data.token) {
-        localStorage.setItem('jwt_token', data.token);
-      }
-      if (data.user) {
-        localStorage.setItem('user_session', JSON.stringify(data.user));
-        onLoginSuccess(data.user);
-      }
+      const data = await readJson<{ token?: string; user?: UserSession }>(res);
+      saveSession(data.token, data.user);
+      if (data.user) onLoginSuccess(data.user);
       onClose();
     } catch (err: any) {
       console.error('Error OAuth google:', err);
@@ -163,14 +158,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+    <Modal onClose={onClose}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <LogIn size={22} style={{ color: 'var(--accent-cyan)' }} />
             <h2 className="modal-title">Iniciar Sesión</h2>
           </div>
-          <button className="close-btn" onClick={onClose}>
+          <button className="close-btn" onClick={onClose} aria-label={t.close}>
             <X size={20} />
           </button>
         </div>
@@ -222,8 +216,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             <span>{isLoading && activeProvider === 'google' ? 'Conectando con Google...' : 'Continuar con Google'}</span>
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

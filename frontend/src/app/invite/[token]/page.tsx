@@ -12,6 +12,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Users, Loader2, AlertCircle, CheckCircle2, LogIn } from 'lucide-react';
 import { LoginModal } from '../../../components/LoginModal';
+import { apiFetch, apiJson, errorMessage } from '../../../lib/api';
+import { getToken } from '../../../lib/session';
 
 interface InvitePreview {
   albumTitle: string;
@@ -33,13 +35,11 @@ export default function InvitePage() {
   const [isAccepting, setIsAccepting] = useState(false);
   const [accepted, setAccepted] = useState(false);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-
   useEffect(() => {
     if (!token) return;
     (async () => {
       try {
-        const res = await fetch(`${apiUrl}/invites/${token}`);
+        const res = await apiFetch(`/invites/${token}`);
         const data = await res.json();
         if (!res.ok) {
           setErrorMsg(data.error || 'La invitación no es válida.');
@@ -53,12 +53,11 @@ export default function InvitePage() {
         setStatus('error');
       }
     })();
-  }, [token, apiUrl]);
+  }, [token]);
 
   // Si el invitado no tiene sesión, primero debe registrarse/iniciar sesión
   const handleAccept = async () => {
-    const jwtToken = localStorage.getItem('jwt_token');
-    if (!jwtToken) {
+    if (!getToken()) {
       setIsLoginOpen(true);
       return;
     }
@@ -66,17 +65,12 @@ export default function InvitePage() {
     setIsAccepting(true);
     setErrorMsg(null);
     try {
-      const res = await fetch(`${apiUrl}/invites/${token}/accept`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${jwtToken}` },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'No se pudo aceptar la invitación');
+      await apiJson(`/invites/${token}/accept`, { method: 'POST' }, 'No se pudo aceptar la invitación');
 
       setAccepted(true);
       setTimeout(() => router.push('/'), 1200);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'No se pudo aceptar la invitación');
+      setErrorMsg(errorMessage(err, 'No se pudo aceptar la invitación'));
     } finally {
       setIsAccepting(false);
     }
@@ -153,7 +147,6 @@ export default function InvitePage() {
       <LoginModal
         isOpen={isLoginOpen}
         onClose={() => setIsLoginOpen(false)}
-        locale="es"
         onLoginSuccess={() => {
           setIsLoginOpen(false);
           // Issue #12: tras el login se acepta la invitación con la sesión nueva

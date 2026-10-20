@@ -61,13 +61,16 @@ adef/
 ├── .env.example            # Variables de entorno documentadas
 ├── docs/                   # Documentación del sistema (ver abajo)
 ├── backend/                # API REST (Express + TypeScript + Prisma)
-│   ├── src/index.ts        #   Rutas y middlewares
-│   ├── src/services/       #   OCR/ALPR y almacenamiento de imágenes
+│   ├── src/app.ts          #   App Express (middlewares + routers)
+│   ├── src/routes/         #   Un router por dominio
+│   ├── src/middleware/     #   Autenticación JWT / admin y consumo de API
+│   ├── src/services/       #   Lógica de dominio, OCR/ALPR e imágenes
 │   └── prisma/             #   Schema y migraciones (PostgreSQL)
 └── frontend/               # App Next.js (App Router)
     ├── src/app/            #   Páginas (principal, /invite/[token])
     ├── src/components/     #   Componentes React (grilla, modales, paneles)
-    └── src/lib/            #   i18n (ES/EN) y manejo de tema
+    ├── src/lib/            #   Cliente de API, sesión, idioma (ES/EN), tema
+    └── src/types/          #   Tipos de dominio compartidos
 ```
 
 ---

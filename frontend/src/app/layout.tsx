@@ -3,9 +3,11 @@ import type { Metadata } from 'next';
  * Layout raíz de la app Next.js (App Router).
  * Importa los estilos globales, define los metadatos SEO (título,
  * descripción, keywords y favicon de chapa patente #47) y envuelve todas
- * las páginas con <html>/<body>.
+ * las páginas con <html>/<body> y el proveedor de idioma (LocaleProvider).
  */
 import '../styles/globals.css';
+import { LocaleProvider } from '../lib/LocaleContext';
+import { THEME_STORAGE_KEY } from '../lib/theme';
 
 export const metadata: Metadata = {
   title: 'Álbum de Patentes | Colección de Patentes 000-999',
@@ -31,12 +33,12 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('album-theme');if(t==='light'){document.documentElement.setAttribute('data-theme','light');}}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});if(t==='light'){document.documentElement.setAttribute('data-theme','light');}}catch(e){}})();`,
           }}
         />
       </head>
       <body>
-        {children}
+        <LocaleProvider>{children}</LocaleProvider>
       </body>
     </html>
   );

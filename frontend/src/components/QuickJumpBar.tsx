@@ -9,10 +9,9 @@
 
 import React, { useState } from 'react';
 import { ListOrdered } from 'lucide-react';
-import { getTranslation, Locale } from '../lib/i18n';
+import { useLocale } from '../lib/LocaleContext';
 
 interface QuickJumpBarProps {
-  locale: Locale;
   /** Casilleros ancla: 0, 100, 200, ... 900 (Issue #32) */
   groups: number[];
   /** Grupo (centena) en el que está parado el usuario */
@@ -30,13 +29,12 @@ interface QuickJumpBarProps {
  * En pantallas angostas colapsa en un botón flotante que despliega la barra.
  */
 export const QuickJumpBar: React.FC<QuickJumpBarProps> = ({
-  locale,
   groups,
   activeGroup,
   onJump,
   collapsed = false,
 }) => {
-  const t = getTranslation(locale);
+  const { t } = useLocale();
   const [isOpen, setIsOpen] = useState(false);
 
   if (!collapsed) {

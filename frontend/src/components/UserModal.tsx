@@ -14,50 +14,20 @@ import {
   X, Mail, Globe, Users, Trash2, Copy, Check,
   Share2, Plus, AlertCircle, AlertTriangle, Loader2, LogOut, ShieldCheck, Link2, Bell, Sun, Moon
 } from 'lucide-react';
-import { getTranslation, Locale } from '../lib/i18n';
+import { useLocale } from '../lib/LocaleContext';
+import { apiFetch, apiJson, errorMessage } from '../lib/api';
+import type { ActionMessage, AlbumMember, Invite, InviteLogEntry, UserSession } from '../types/domain';
+import { Modal } from './Modal';
 // Issue #54: popup de confirmación para la baja definitiva de la cuenta
 import { ConfirmDialog } from './ConfirmDialog';
 // Issue #43: el cambio de tema se expone desde el panel de usuario
 import { Theme, getStoredTheme, applyTheme } from '../lib/theme';
 
-interface UserSession {
-  email: string;
-  name: string;
-  avatarUrl?: string;
-  // Issue #41: datos de cuenta para el panel de administración
-  id?: string;
-  isAdmin?: boolean;
-}
-
-interface Invite {
-  id: string;
-  token: string;
-  url: string;
-  expiresAt: string;
-  usedAt: string | null;
-  isValid: boolean;
-}
-
-interface AlbumMember {
-  id: string;
-  role: string;
-  joinedAt: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    avatarUrl?: string;
-  };
-}
-
 interface UserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  locale: Locale;
-  setLocale: (l: Locale) => void;
   userSession: UserSession | null;
   onLogout: () => void;
-  onOpenInviteModal?: () => void;
   // Issue #41: abrir el panel privado de administración (solo se muestra para admins)
   onOpenAdminPanel?: () => void;
 }
@@ -65,32 +35,21 @@ interface UserModalProps {
 export const UserModal: React.FC<UserModalProps> = ({
   isOpen,
   onClose,
-  locale,
-  setLocale,
   userSession,
   onLogout,
   onOpenAdminPanel,
 }) => {
-  const t = getTranslation(locale);
+  const { locale, setLocale, t } = useLocale();
   const [invites, setInvites] = useState<Invite[]>([]);
   const [members, setMembers] = useState<AlbumMember[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [actionMsg, setActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [actionMsg, setActionMsg] = useState<ActionMessage | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   // Issue #34: preferencia de avisos de actividad del álbum
   const [notifyAlbumActivity, setNotifyAlbumActivity] = useState(true);
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
   // Issue #39: historial de invitaciones (aceptadas/vencidas + fotos aportadas)
-  interface InviteLogEntry {
-    id: string;
-    createdAt: string;
-    expiresAt: string;
-    usedAt: string | null;
-    status: 'accepted' | 'expired' | 'pending';
-    usedBy: { id: string; name: string; email: string } | null;
-    stickersAdded: number;
-  }
   const [inviteLog, setInviteLog] = useState<InviteLogEntry[]>([]);
   // Issue #43: control de tema claro/oscuro dentro del panel de usuario
   // Issue #45: selector con dos opciones explícitas (Claro / Oscuro) en su propia sección
@@ -131,24 +90,17 @@ export const UserModal: React.FC<UserModalProps> = ({
     </div>
   );
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-
-  const authHeaders = useCallback((): Record<string, string> => {
-    const jwtToken = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
-    return jwtToken ? { Authorization: `Bearer ${jwtToken}` } : {};
-  }, []);
-
   const loadData = useCallback(async () => {
     if (!userSession) return;
     setIsLoading(true);
     try {
       const [invitesRes, membersRes, prefsRes, logRes] = await Promise.all([
-        fetch(`${apiUrl}/album/invites`, { headers: authHeaders() }),
-        fetch(`${apiUrl}/album/members`, { headers: authHeaders() }),
+        apiFetch('/album/invites'),
+        apiFetch('/album/members'),
         // Issue #34: preferencia de avisos de actividad del álbum
-        fetch(`${apiUrl}/users/me/preferences`, { headers: authHeaders() }),
+        apiFetch('/users/me/preferences'),
         // Issue #39: historial de invitaciones cerca del gestor de invitaciones
-        fetch(`${apiUrl}/invites/log`, { headers: authHeaders() }),
+        apiFetch('/invites/log'),
       ]);
 
       if (invitesRes.ok) {
@@ -174,7 +126,7 @@ export const UserModal: React.FC<UserModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [apiUrl, authHeaders, userSession]);
+  }, [userSession]);
 
   useEffect(() => {
     if (isOpen) {
@@ -196,13 +148,11 @@ export const UserModal: React.FC<UserModalProps> = ({
     setActionMsg(null);
 
     try {
-      const res = await fetch(`${apiUrl}/users/me/preferences`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ notifyOnAlbumActivity: nextValue }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'No se pudo guardar la preferencia.');
+      await apiJson(
+        '/users/me/preferences',
+        { method: 'PUT', json: { notifyOnAlbumActivity: nextValue } },
+        'No se pudo guardar la preferencia.',
+      );
 
       setActionMsg({
         type: 'success',
@@ -212,7 +162,7 @@ export const UserModal: React.FC<UserModalProps> = ({
       setNotifyAlbumActivity(previousValue);
       setActionMsg({
         type: 'error',
-        text: err instanceof Error ? err.message : 'Error al guardar la preferencia.',
+        text: errorMessage(err, 'Error al guardar la preferencia.'),
       });
     } finally {
       setIsSavingPrefs(false);
@@ -227,12 +177,7 @@ export const UserModal: React.FC<UserModalProps> = ({
     setIsDeletingAccount(true);
     setDeleteAccountError(null);
     try {
-      const res = await fetch(`${apiUrl}/users/me`, {
-        method: 'DELETE',
-        headers: authHeaders(),
-      });
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) throw new Error(body.error || t.deleteAccountError);
+      await apiJson('/users/me', { method: 'DELETE' }, t.deleteAccountError);
 
       // La cuenta ya no existe: se cierra el popup, se avisa y se limpia la sesión
       setIsDeleteDialogOpen(false);
@@ -241,7 +186,7 @@ export const UserModal: React.FC<UserModalProps> = ({
       onLogout();
     } catch (err) {
       // El error queda visible dentro del popup de confirmación
-      setDeleteAccountError(err instanceof Error ? err.message : t.deleteAccountError);
+      setDeleteAccountError(errorMessage(err, t.deleteAccountError));
     } finally {
       setIsDeletingAccount(false);
     }
@@ -251,18 +196,13 @@ export const UserModal: React.FC<UserModalProps> = ({
     setIsCreating(true);
     setActionMsg(null);
     try {
-      const res = await fetch(`${apiUrl}/album/invites`, {
-        method: 'POST',
-        headers: authHeaders(),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'No se pudo generar la invitación.');
+      const data = await apiJson('/album/invites', { method: 'POST' }, 'No se pudo generar la invitación.');
       setInvites((prev) => [{ ...data.invite, isValid: true }, ...prev]);
       setActionMsg({ type: 'success', text: '¡Nueva invitación generada con éxito!' });
     } catch (err) {
       setActionMsg({
         type: 'error',
-        text: err instanceof Error ? err.message : 'Error al crear invitación.',
+        text: errorMessage(err, 'Error al crear invitación.'),
       });
     } finally {
       setIsCreating(false);
@@ -271,40 +211,26 @@ export const UserModal: React.FC<UserModalProps> = ({
 
   const handleRevokeInvite = async (inviteId: string) => {
     try {
-      const res = await fetch(`${apiUrl}/album/invites/${inviteId}`, {
-        method: 'DELETE',
-        headers: authHeaders(),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'No se pudo revocar la invitación.');
-      }
+      await apiJson(`/album/invites/${inviteId}`, { method: 'DELETE' }, 'No se pudo revocar la invitación.');
       setInvites((prev) => prev.filter((i) => i.id !== inviteId));
       setActionMsg({ type: 'success', text: t.revokedSuccess });
     } catch (err) {
       setActionMsg({
         type: 'error',
-        text: err instanceof Error ? err.message : 'Error al revocar.',
+        text: errorMessage(err, 'Error al revocar.'),
       });
     }
   };
 
   const handleRemoveMember = async (memberUserId: string) => {
     try {
-      const res = await fetch(`${apiUrl}/album/members/${memberUserId}`, {
-        method: 'DELETE',
-        headers: authHeaders(),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'No se pudo remover al asociado.');
-      }
+      await apiJson(`/album/members/${memberUserId}`, { method: 'DELETE' }, 'No se pudo remover al asociado.');
       setMembers((prev) => prev.filter((m) => m.user.id !== memberUserId));
       setActionMsg({ type: 'success', text: 'Asociado removido del álbum.' });
     } catch (err) {
       setActionMsg({
         type: 'error',
-        text: err instanceof Error ? err.message : 'Error al remover asociado.',
+        text: errorMessage(err, 'Error al remover asociado.'),
       });
     }
   };
@@ -338,8 +264,7 @@ export const UserModal: React.FC<UserModalProps> = ({
   if (!isOpen || !userSession) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card user-panel-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+    <Modal onClose={onClose} className="modal-card user-panel-card" style={{ maxWidth: '620px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         {/* Header Modal — Issue #45: nombre de usuario y email dentro del header del título */}
         <div className="modal-header" style={{ marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -362,7 +287,7 @@ export const UserModal: React.FC<UserModalProps> = ({
               </div>
             </div>
           </div>
-          <button className="close-btn" onClick={onClose} aria-label="Cerrar">
+          <button className="close-btn" onClick={onClose} aria-label={t.close}>
             <X size={20} />
           </button>
         </div>
@@ -725,7 +650,6 @@ export const UserModal: React.FC<UserModalProps> = ({
         {/* Issue #54: confirmación de la baja definitiva de la cuenta (irreversible) */}
         <ConfirmDialog
           isOpen={isDeleteDialogOpen}
-          locale={locale}
           title={t.deleteAccountConfirmTitle}
           message={t.deleteAccountConfirmMsg}
           hint={t.deleteAccountConfirmHint}
@@ -740,7 +664,6 @@ export const UserModal: React.FC<UserModalProps> = ({
             setDeleteAccountError(null);
           }}
         />
-      </div>
-    </div>
+    </Modal>
   );
 };
