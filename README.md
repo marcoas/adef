@@ -10,7 +10,7 @@ Webapp lúdica y familiar (responsive mobile y desktop) inspirada en el concepto
 - **Formato de Patentes Soportados:**
   - Modelo Antiguo: `AAA 000` (Ejemplo: `ABC 123` ➔ Casillero **123**).
   - Modelo Vigente (Mercosur): `AA 000 AA` (Ejemplo: `AE 789 CD` ➔ Casillero **789**).
-- **Escaneo con OCR (Reconocimiento Automático):** Procesa imágenes de patentes y ubica automáticamente la figurita en el casillero correspondiente.
+- **Escaneo con OCR (Reconocimiento Automático):** Procesa imágenes de patentes y ubica automáticamente la figurita en el casillero correspondiente. La foto se comprime en el navegador (máx. 1280 px, JPEG) antes de subirla para ahorrar datos móviles y tráfico del servidor.
 - **Colaboración Familiar / Asociados:** Invita a amigos o familiares a compartir y completar un mismo álbum.
 - **Multi-idioma (i18n):** Interfaz disponible en Español e Inglés.
 - **Entorno 100% Gratuito y Dockerizado:** Despliegue local con un solo comando utilizando Docker Compose.
@@ -69,7 +69,7 @@ adef/
 └── frontend/               # App Next.js (App Router)
     ├── src/app/            #   Páginas (principal, /invite/[token])
     ├── src/components/     #   Componentes React (grilla, modales, paneles)
-    ├── src/lib/            #   Cliente de API, sesión, idioma (ES/EN), tema
+    ├── src/lib/            #   Cliente de API, sesión, idioma (ES/EN), tema, compresión de fotos
     └── src/types/          #   Tipos de dominio compartidos
 ```
 

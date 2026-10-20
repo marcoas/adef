@@ -2,7 +2,8 @@
 
 /**
  * Modal de captura y pegado de figuritas (#10, #53).
- * Acepta foto de cámara o archivo, valida tipo/tamaño, reconoce la patente
+ * Acepta foto de cámara o archivo, valida tipo/tamaño, la comprime en el
+ * navegador (lib/imageCompression: 1280 px, JPEG 0,8), reconoce la patente
  * con ALPR/OCR (POST /api/plates/ocr) sugiriendo el casillero, permite
  * corregirlo manualmente y confirma el pegado (POST /api/album/stickers)
  * en el álbum activo. Durante el OCR informa el casillero detectado al
@@ -15,6 +16,7 @@ import { useLocale } from '../lib/LocaleContext';
 import { apiFetch, readJson, withAlbum } from '../lib/api';
 import { extractSlot, extractSlotDigits, padSlot } from '../lib/format';
 import { getToken } from '../lib/session';
+import { compressImage } from '../lib/imageCompression';
 import { Modal } from './Modal';
 
 interface UploadModalProps {
@@ -45,6 +47,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const imageRef = useRef<HTMLImageElement | null>(null);
+  // Identifica la foto en curso: si el usuario cierra o cambia la foto mientras
+  // se comprime, el resultado de la compresión anterior se descarta.
+  const uploadIdRef = useRef(0);
 
   // Issue #53: en cuanto el OCR entrega una patente con 3 dígitos se informa el
   // casillero correspondiente para que el álbum se desplace hasta él mientras el
@@ -61,6 +66,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   if (!isOpen) return null;
 
   const handleClose = () => {
+    uploadIdRef.current += 1;
     setImagePreview(null);
     setPlateInput('');
     setErrorMsg(null);
@@ -69,6 +75,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   const handleResetPhoto = () => {
+    uploadIdRef.current += 1;
     setImagePreview(null);
     setPlateInput('');
     setErrorMsg(null);
@@ -92,16 +99,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     }
 
     setErrorMsg(null);
+    setIsProcessingOCR(true);
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64Data = reader.result as string;
-      setImagePreview(base64Data);
-
-      // Enviar la imagen original completa al motor ALPR/Plate Recognizer para detección automática instantánea
-      runRealOCR(base64Data);
-    };
-    reader.readAsDataURL(file);
+    // Se comprime una sola vez en el navegador (lado mayor 1280 px, JPEG 0,8)
+    // y esa misma imagen se usa para el preview, el OCR y el guardado de la
+    // figurita: evita subir dos veces la foto original de 3–5 MB.
+    const uploadId = ++uploadIdRef.current;
+    const compressedImage = await compressImage(file);
+    if (uploadId !== uploadIdRef.current) return;
+    setImagePreview(compressedImage);
+    runRealOCR(compressedImage);
   };
 
   const runRealOCR = async (imageBase64: string) => {

@@ -58,7 +58,7 @@ adef/
         ├── app/                # App Router: page.tsx, layout.tsx, invite/[token]
         ├── components/         # Componentes React (ver §3)
         ├── lib/                # api.ts, session.ts, LocaleContext.tsx, format.ts,
-        │                       #   i18n.ts (ES/EN), theme.ts
+        │                       #   i18n.ts (ES/EN), theme.ts, imageCompression.ts
         ├── types/domain.ts     # Tipos de dominio compartidos
         └── styles/             # globals.css (diseño + variables CSS)
 ```
@@ -81,10 +81,10 @@ adef/
 ### Frontend (Next.js App Router)
 
 - **`app/page.tsx`** — orquestador único de estado (sesión, álbum activo, álbumes, modales).
-- **Componentes principales:** `AlbumGrid` (grilla 000-999 con filtros y controles), `Header` (acciones + menú de usuario), `UploadModal` (captura/OCR), `StickerModal` (detalle/despegar), `UserModal` (panel de usuario #15/#45, invitaciones #12 y autoeliminación #54), `AdminPanel` (#41), `InvitePage` (#12), `NotificationsBell` (#34), `ActivityLogModal` (#33), `RankingModal` (#40), `ConfirmDialog` (#31), `QuickJumpBar` (#32) y `Modal` (contenedor común: overlay, tarjeta y cierre con Escape).
+- **Componentes principales:** `AlbumGrid` (grilla 000-999 con filtros y controles), `Header` (acciones + menú de usuario), `UploadModal` (captura, compresión y OCR), `StickerModal` (detalle/despegar), `UserModal` (panel de usuario #15/#45, invitaciones #12 y autoeliminación #54), `AdminPanel` (#41), `InvitePage` (#12), `NotificationsBell` (#34), `ActivityLogModal` (#33), `RankingModal` (#40), `ConfirmDialog` (#31), `QuickJumpBar` (#32) y `Modal` (contenedor común: overlay, tarjeta y cierre con Escape).
 - **Acceso al backend:** siempre vía `lib/api.ts` (`apiFetch` / `apiJson` / `withAlbum`), que agrega la URL base y el JWT y convierte las respuestas `{ error }` en `ApiError`. La sesión (JWT + usuario en localStorage) se maneja solo con `lib/session.ts`.
 - **Tipos:** las formas de datos compartidas viven en `types/domain.ts`.
-- **Cross-cutting:** `lib/LocaleContext.tsx` (`useLocale()` devuelve `locale`, `setLocale` y los textos `t` de `lib/i18n.ts`, ES/EN), `lib/theme.ts` (tema claro/oscuro persistente #36/#43), `lib/format.ts` (casilleros y fechas).
+- **Cross-cutting:** `lib/LocaleContext.tsx` (`useLocale()` devuelve `locale`, `setLocale` y los textos `t` de `lib/i18n.ts`, ES/EN), `lib/theme.ts` (tema claro/oscuro persistente #36/#43), `lib/format.ts` (casilleros y fechas), `lib/imageCompression.ts` (compresión de fotos en el navegador antes de subirlas, ver §5).
 
 ---
 
@@ -108,7 +108,10 @@ El número entero resultante (ej: `042` ➔ `42`) corresponde al casillero únic
 
 ```
 [UploadModal]                     [Backend]                          [BD / Almacenamiento]
-     │  1. foto (cámara/archivo)      │                                        │
+     │  0. foto (cámara/archivo)     │                                        │
+     │  compressImage() en el        │                                        │
+     │  navegador: ≤1280 px, JPEG 0,8│                                        │
+     │  1. imagen comprimida         │                                        │
      │──────────────────────────────►│  POST /api/plates/ocr                  │
      │                               │  (ALPR vía Plate Recognizer)          │
      │                               │  + registro en external_api_calls #48 │
@@ -116,6 +119,7 @@ El número entero resultante (ej: `042` ➔ `42`) corresponde al casillero únic
      │◄──────────────────────────────│                                        │
      │  3. usuario confirma          │                                        │
      │  POST /api/album/stickers     │                                        │
+     │  (misma imagen comprimida)    │                                        │
      │──────────────────────────────►│  extractPlate() → slot 000-999         │
      │                               │  valida imagen (tipo/tamaño) #10       │
      │                               │  chequea unicidad (409 si ocupado)     │
@@ -124,6 +128,8 @@ El número entero resultante (ej: `042` ➔ `42`) corresponde al casillero únic
      │                               │  + notification al dueño #34          │
      │  4. grilla se actualiza       │◄──────────────────────────────────────│
 ```
+
+**Compresión en el navegador:** antes de cualquier envío, `UploadModal` pasa la foto (JPG/PNG de hasta 5 MB) por `compressImage()` de `frontend/src/lib/imageCompression.ts`, que con canvas (sin dependencias) la redimensiona a un lado mayor de **1280 px** como máximo (nunca agranda fotos chicas), aplica la orientación EXIF (`createImageBitmap(..., { imageOrientation: 'from-image' })`, con fallback a `<img>`) y la exporta como **data URL JPEG calidad 0,8**. Se comprime **una sola vez** y esa misma imagen se usa para el preview, el OCR y el guardado, así la foto de 3–5 MB de un celular viaja como unos cientos de KB (dos veces) en lugar de pesar varios MB en cada envío: el tráfico saliente es el recurso más caro del hosting gratuito. Si la compresión falla (navegador sin soporte, archivo corrupto) o no achica la imagen (p. ej. un PNG chico), se envía la original leída con `FileReader`, por lo que el flujo nunca se rompe. El resultado (`data:image/jpeg;base64,...`) cumple la validación del backend (`validateImageInput`: MIME JPG/PNG y `MAX_IMAGE_SIZE_MB`).
 
 Detalles: la casilla solo se llena si está vacía (carácter lúdico, sin validación anti-fraude #8); la imagen viaja como data URL o URL http(s), y el backend responde `422` si la patente no es válida, `415`/`413` si el formato o tamaño de la imagen no corresponde.
 

@@ -66,7 +66,7 @@ Todas están documentadas en [`.env.example`](../.env.example). Las más relevan
 | `JWT_SECRET` | Secreto de firma del JWT (obligatorio cambiarlo en producción). |
 | `ADMIN_EMAILS` | Correos sembrados como admin en cada login (#41). |
 | `IMAGE_PROVIDER` | `local` o `cloudinary` (+ credenciales Cloudinary). |
-| `MAX_IMAGE_SIZE_MB` | Tamaño máximo de foto a subir (#10). |
+| `MAX_IMAGE_SIZE_MB` | Tamaño máximo de foto a subir (#10). Se valida sobre la imagen ya comprimida por el navegador (normalmente < 0,5 MB). |
 | `PLATE_RECOGNIZER_TOKEN` / `PLATE_RECOGNIZER_MONTHLY_QUOTA` | API ALPR y su cuota mensual (#48). |
 | `NEXT_PUBLIC_API_URL` | URL de la API para el frontend. |
 | `FRONTEND_URL` | URL pública del frontend (para armar links de invitación). |
@@ -94,6 +94,7 @@ npm run prisma:generate       # refresca los tipos del cliente
 - **i18n:** toda cadena visible en UI se agrega en `frontend/src/lib/i18n.ts` con traducción **ES y EN** y se lee con `const { t } = useLocale()`; no hardcodear textos en los componentes.
 - **Backend:** rutas nuevas en `backend/src/routes/<dominio>.ts` envueltas en `asyncHandler`; la lógica reutilizable va en `services/`, la configuración en `config.ts`.
 - **Frontend:** llamar al backend solo con `lib/api.ts` (nunca `fetch` directo ni leer `localStorage` para el token) y declarar tipos compartidos en `types/domain.ts`.
+- **Fotos:** toda imagen que se envíe al backend pasa antes por `compressImage()` de `lib/imageCompression.ts` (máx. 1280 px, JPEG 0,8, orientación EXIF) y se reutiliza el mismo resultado en todos los envíos; no mandar el base64 original del archivo.
 - **Chequeos:** `npm run typecheck` (backend) y `npm run lint` + `npm run build` (frontend) antes de commitear.
 - **Estilos:** variables CSS globales (`--bg-card`, `--border-color`, etc.) y clases utilitarias existentes (`btn-primary`, `btn-secondary`, `btn-danger`, `modal-overlay`...); evitar estilos inline salvo dinamismo.
 - **Popups de confirmación:** usar `ConfirmDialog` (Issue #31), nunca `window.confirm`.
