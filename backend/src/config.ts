@@ -9,7 +9,14 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const PORT = process.env.PORT || 4000;
+// En producción el secreto es obligatorio: con un valor por defecto conocido
+// (está en el repo) cualquiera podría firmar JWT válidos para cualquier usuario.
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('JWT_SECRET es obligatorio en producción.');
+}
 export const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_patentes_2026_change_me';
+// Client id de Google OAuth: el login solo acepta tokens emitidos para él
+export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 export const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Issue #10: límites de carga de imágenes (solo JPG/PNG y tamaño máximo)

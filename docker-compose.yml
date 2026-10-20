@@ -38,6 +38,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-patentes_user}:${POSTGRES_PASSWORD:-patentes_pass_secret}@postgres:5432/${POSTGRES_DB:-patentes_db}?schema=public
       JWT_SECRET: ${JWT_SECRET:-super_secret_jwt_key_patentes_2026_change_me}
       FRONTEND_URL: http://localhost:3000
+      # Login: el backend verifica que el token de Google sea para este client id
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       PLATE_RECOGNIZER_TOKEN: ${PLATE_RECOGNIZER_TOKEN}
       # Issue #48: cuota mensual de llamadas a Plate Recognizer (panel de admin)
       PLATE_RECOGNIZER_MONTHLY_QUOTA: ${PLATE_RECOGNIZER_MONTHLY_QUOTA:-1000}

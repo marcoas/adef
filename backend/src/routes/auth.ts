@@ -4,37 +4,35 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../db';
-import { ADMIN_EMAILS, JWT_SECRET } from '../config';
+import { ADMIN_EMAILS, GOOGLE_CLIENT_ID, JWT_SECRET } from '../config';
 import { requireAuth } from '../middleware/auth';
 import { strictLimiter } from '../middleware/rateLimit';
 import { asyncHandler } from '../lib/asyncHandler';
+import { verifyGoogleAccessToken } from '../services/googleAuth';
 import { authUser } from '../types';
 
 const router = Router();
 
 router.post('/auth/login', strictLimiter, asyncHandler(async (req, res) => {
-  const { email, name, avatarUrl, idToken, authProvider } = req.body;
-  let userEmail = email;
-  let userName = name;
-  let userAvatar = avatarUrl;
-
-  // Si viene idToken de Google OAuth, extraer información de usuario del token
-  if (idToken) {
-    try {
-      const decoded: any = jwt.decode(idToken);
-      if (decoded && decoded.email) {
-        userEmail = decoded.email;
-        userName = decoded.name || decoded.given_name || userEmail.split('@')[0];
-        userAvatar = decoded.picture || avatarUrl;
-      }
-    } catch (err) {
-      console.warn('Error al decodificar idToken de Google:', err);
-    }
+  // La identidad SIEMPRE sale del access token verificado con Google; nunca
+  // se confía en email/nombre enviados por el cliente (permitiría suplantar
+  // a cualquier usuario).
+  const { accessToken } = req.body ?? {};
+  if (!accessToken || typeof accessToken !== 'string') {
+    return res.status(400).json({ error: 'Se requiere el token de acceso de Google para iniciar sesión' });
+  }
+  if (!GOOGLE_CLIENT_ID) {
+    console.error('GOOGLE_CLIENT_ID no está configurado en el backend.');
+    return res.status(500).json({ error: 'El login con Google no está configurado en el servidor' });
   }
 
-  if (!userEmail) {
-    return res.status(400).json({ error: 'Se requiere un email válido para iniciar sesión' });
+  const profile = await verifyGoogleAccessToken(accessToken, GOOGLE_CLIENT_ID);
+  if (!profile) {
+    return res.status(401).json({ error: 'No se pudo verificar tu cuenta de Google. Iniciá sesión nuevamente.' });
   }
+  const userEmail = profile.email;
+  const userName = profile.name;
+  const userAvatar = profile.picture;
 
   let user = await prisma.user.findUnique({ where: { email: userEmail } });
   if (!user) {
@@ -42,7 +40,7 @@ router.post('/auth/login', strictLimiter, asyncHandler(async (req, res) => {
       data: {
         email: userEmail,
         name: userName || userEmail.split('@')[0],
-        authProvider: authProvider || 'google',
+        authProvider: 'google',
         avatarUrl: userAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
       },
     });

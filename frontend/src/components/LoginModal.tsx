@@ -84,29 +84,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setErrorMessage('El SDK de Google aún se está cargando. Reintenta en unos segundos.');
   };
 
-  const executeOAuthBackendLogin = async (
-    defaultName: string,
-    defaultEmail: string,
-    avatarOverride?: string,
-  ) => {
+  // El backend verifica el access token con Google y toma de ahí la identidad
+  // (email, nombre y foto); el cliente nunca envía datos de usuario sueltos.
+  const executeOAuthBackendLogin = async (accessToken: string) => {
     try {
       const res = await apiFetch('/auth/login', {
         method: 'POST',
-        json: {
-          email: defaultEmail,
-          name: defaultName,
-          avatarUrl:
-            avatarOverride ||
-            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-          authProvider: 'google',
-        },
+        json: { accessToken },
       });
-
+      const data = await readJson<{ token?: string; user?: UserSession; error?: string }>(res);
       if (!res.ok) {
-        throw new Error('Error al autenticar con Google');
+        throw new Error(data.error || 'Error al autenticar con Google');
       }
-
-      const data = await readJson<{ token?: string; user?: UserSession }>(res);
       saveSession(data.token, data.user);
       if (data.user) onLoginSuccess(data.user);
       onClose();
@@ -120,7 +109,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   };
 
   // Abre el popup real de Google con selector de cuenta (usando el SDK GIS ya cargado).
-  // Flujo: token de acceso -> userinfo -> login en el backend con email/name/avatar.
+  // Flujo: token de acceso -> login en el backend, que lo verifica con Google.
   const openGoogleAccountChooser = (clientId: string) => {
     const tokenClient = window.google!.accounts.oauth2!.initTokenClient({
       client_id: clientId,
@@ -133,25 +122,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           setErrorMessage(`Google devolvió un error: ${tokenResponse.error}`);
           return;
         }
-        try {
-          const profileRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
-            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-          });
-          if (!profileRes.ok) {
-            throw new Error('No se pudo obtener tu perfil de Google');
-          }
-          const profile = await profileRes.json();
-          await executeOAuthBackendLogin(
-            profile.name || profile.email,
-            profile.email,
-            profile.picture,
-          );
-        } catch (err: any) {
-          console.error('Error obteniendo perfil de Google:', err);
-          setErrorMessage(err.message || 'No se pudo obtener tu perfil de Google');
-          setIsLoading(false);
-          setActiveProvider(null);
-        }
+        await executeOAuthBackendLogin(tokenResponse.access_token);
       },
     });
     tokenClient.requestAccessToken();
