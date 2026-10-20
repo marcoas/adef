@@ -39,14 +39,42 @@ npm run dev                  # next dev en :3000
 
 > La base de datos puede quedarse en contenedor mientras backend/frontend corren local: solo levantá el servicio `postgres` (`docker compose up postgres`) y asegurate de que `DATABASE_URL` apunte al host correcto (`localhost` en vez de `postgres`).
 
+### Imágenes Docker (multi-stage)
+
+`backend/Dockerfile` y `frontend/Dockerfile` tienen varios *targets*.
+`docker-compose.yml` usa `target: dev` (recarga en caliente con el código
+montado como volumen), así que el flujo de desarrollo no cambia.
+
+| Target | Backend | Frontend |
+|---|---|---|
+| `dev` | `npm run dev` (ts-node-dev) | `npm run dev` (next dev) |
+| `build` | `npm ci` + `tsc` + `prisma generate` | `npm install` + `next build` (`NEXT_PUBLIC_*` como build args) |
+| `migrate` | `prisma migrate deploy` y termina (pre-deploy) | — |
+| `production` (último, el de por defecto) | Solo dependencias de producción, `NODE_ENV=production`, `node dist/index.js` bajo `tini`, usuario `node` | `next start` |
+
+```bash
+# Construir la imagen de producción del backend y la de migraciones
+cd backend
+docker build --target production -t album-backend:prod .
+docker build --target migrate    -t album-backend:migrate .
+```
+
+Las imágenes funcionan en x86_64 y ARM64 (Oracle A1): el motor de Prisma
+(`linux-musl[-arm64]-openssl-3.0.x`) y el binario de sharp se resuelven dentro
+del build según la arquitectura. El despliegue completo está en
+[DEPLOY_GUIDE.md](DEPLOY_GUIDE.md); `docker-compose.prod.yml` + `Caddyfile`
+son la variante de producción en una sola VM.
+
 ## 3. Scripts npm
 
 | Comando | Contexto | Descripción |
 |---|---|---|
 | `npm run dev` | backend | Servidor con recarga (`ts-node-dev`). |
 | `npm run build` | backend | Compila TypeScript (`tsc`) y regenera el cliente Prisma. |
+| `npm start` | backend | Producción: `node dist/index.js` (requiere `npm run build`). |
 | `npm run prisma:generate` | backend | Regenera `@prisma/client` tras tocar `schema.prisma`. |
-| `npm run prisma:migrate` | backend | Crea una migración nueva (interactivo, pide nombre). |
+| `npm run prisma:migrate` | backend | Crea una migración nueva (interactivo, pide nombre). Solo desarrollo. |
+| `npm run migrate:deploy` | backend | Aplica las migraciones pendientes sin preguntar (`prisma migrate deploy`). Paso de pre-deploy en producción. |
 | `npm run dev` / `build` / `lint` | frontend | Next.js dev / producción / ESLint. |
 
 ### Validaciones antes de commitear
@@ -84,7 +112,13 @@ npm run prisma:migrate        # genera carpeta en prisma/migrations/ con SQL
 npm run prisma:generate       # refresca los tipos del cliente
 ```
 
-- Las migraciones se versionan en git y se aplican automáticamente al desplegar (Prisma Migrate).
+- Las migraciones se versionan en git y se aplican **una vez por despliegue**
+  con `npm run migrate:deploy`, nunca al arrancar el proceso: en Render dentro
+  del build (el plan free no tiene *pre-deploy*) y en Docker Compose de
+  producción con el servicio `migrate`. Ver [DEPLOY_GUIDE.md](DEPLOY_GUIDE.md).
+- En desarrollo no se aplican solas: tras clonar, o tras un `pull` que trae
+  migraciones nuevas, correr `npm run migrate:deploy` (o `prisma:migrate`)
+  en `backend/` contra la base local.
 - **Regla:** nunca editar una migración ya creada; crear una nueva que corrija.
 
 ## 6. Convenciones del código
@@ -117,6 +151,7 @@ npm run prisma:generate       # refresca los tipos del cliente
 | [DATABASE_DER.md](DATABASE_DER.md) | Modelo de datos completo. |
 | [API.md](API.md) | Todos los endpoints. |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Hosting con costo 0 y capacidad medida. |
+| [DEPLOY_GUIDE.md](DEPLOY_GUIDE.md) | Despliegue paso a paso (Render + Vercel + Neon, u Oracle). |
 | Este archivo | Entorno, scripts y convenciones. |
 
 **Regla:** todo cambio (endpoints, arquitectura, dependencias, variables de

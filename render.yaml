@@ -1,0 +1,79 @@
+# =============================================================
+# Render Blueprint: backend del Álbum de Patentes (plan free)
+# Guía paso a paso: docs/DEPLOY_GUIDE.md
+#
+# Decisiones:
+# - runtime "node" (no "docker"): en el plan free `preDeployCommand` NO está
+#   disponible (solo servicios pagos) y Render no permite elegir el --target
+#   de un Dockerfile. Con runtime node las migraciones corren en el
+#   buildCommand, una vez por deploy y con DATABASE_URL disponible; si fallan,
+#   el deploy falla y sigue sirviendo la versión anterior. Además se evita el
+#   overhead de construir la imagen y arranca más rápido al despertar.
+# - Arranque con `node dist/index.js` (lo mismo que `npm start`, sin el
+#   proceso extra de npm: ~30 MB menos de los 512 MB del plan free).
+# - Cuando el servicio pase a un plan pago, mover `npm run migrate:deploy`
+#   del buildCommand a `preDeployCommand: npm run migrate:deploy`.
+# =============================================================
+services:
+  - type: web
+    name: album-patentes-api
+    runtime: node
+    plan: free
+    # No se puede cambiar después de crear el servicio. Elegir la misma
+    # región que la base de Neon (Virginia ↔ AWS us-east-1).
+    region: virginia
+    rootDir: backend
+    # Solo se redespliega si cambia algo del backend (rutas relativas a la
+    # raíz del repo) o este Blueprint.
+    buildFilter:
+      paths:
+        - backend/**
+        - render.yaml
+    # --include=dev: NODE_ENV=production haría que npm omita tsc y la CLI de
+    # prisma, necesarios para compilar y migrar.
+    buildCommand: npm ci --include=dev && npm run build && npm run migrate:deploy
+    startCommand: node dist/index.js
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      # Render inyecta PORT (10000); el backend lo lee de process.env.PORT.
+
+      # --- Secretos / valores propios (se piden al crear el Blueprint) ---
+      # Neon: cadena de conexión DIRECTA (sin "-pooler") con ?sslmode=require
+      - key: DATABASE_URL
+        sync: false
+      # Secreto aleatorio de 256 bits generado por Render
+      - key: JWT_SECRET
+        generateValue: true
+      # URL pública del frontend en Vercel (CORS y links de invitación)
+      - key: FRONTEND_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: PLATE_RECOGNIZER_TOKEN
+        sync: false
+      # Correos separados por coma marcados como admin en cada login
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+
+      # --- Valores no secretos ---
+      # El disco de Render es efímero: las fotos van a Cloudinary
+      - key: IMAGE_PROVIDER
+        value: cloudinary
+      - key: CLOUDINARY_FOLDER
+        value: album-patentes
+      - key: MAX_IMAGE_SIZE_MB
+        value: "5"
+      # Plan gratuito de Plate Recognizer: 2.500 lecturas/mes
+      - key: PLATE_RECOGNIZER_MONTHLY_QUOTA
+        value: "2500"

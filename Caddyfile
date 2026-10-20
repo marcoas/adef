@@ -1,0 +1,20 @@
+# =============================================================
+# Caddy: proxy inverso con HTTPS automático (Let's Encrypt)
+# Lo usa docker-compose.prod.yml (alternativa Oracle Cloud).
+# Un solo dominio: frontend y API comparten origen, así que basta un registro
+# DNS y un único "Authorized JavaScript origin" en Google.
+# =============================================================
+{$DOMAIN} {
+	encode zstd gzip
+
+	# API REST y fotos del proveedor "local" -> backend Express
+	@backend path /api/* /uploads/*
+	handle @backend {
+		reverse_proxy backend:4000
+	}
+
+	# Todo lo demás -> Next.js
+	handle {
+		reverse_proxy frontend:3000
+	}
+}

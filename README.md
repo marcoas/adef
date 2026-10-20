@@ -58,6 +58,8 @@ Webapp lúdica y familiar (responsive mobile y desktop) inspirada en el concepto
 ```
 adef/
 ├── docker-compose.yml      # Orquestación: postgres + backend + frontend
+├── docker-compose.prod.yml # Producción en una VM (Oracle) + Caddyfile (HTTPS)
+├── render.yaml             # Blueprint de Render (backend)
 ├── .env.example            # Variables de entorno documentadas
 ├── docs/                   # Documentación del sistema (ver abajo)
 ├── backend/                # API REST (Express + TypeScript + Prisma)
@@ -85,6 +87,7 @@ cd frontend && npx tsc --noEmit
 # Backend en caliente (sin Docker): npm run dev
 # Frontend en caliente (sin Docker): npm run dev
 # Nueva migración BD:                npm run prisma:migrate  (en backend/)
+# Aplicar migraciones (pre-deploy):  npm run migrate:deploy  (en backend/)
 ```
 
 Guía completa de entorno, scripts, migraciones y convenciones: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.
@@ -98,3 +101,4 @@ Guía completa de entorno, scripts, migraciones y convenciones: **[docs/DEVELOPM
 - [Referencia de la API REST (endpoints)](docs/API.md)
 - [Guía de Desarrollo (setup, scripts, convenciones)](docs/DEVELOPMENT.md)
 - [Despliegue: opciones de hosting y capacidad](docs/DEPLOYMENT.md)
+- [Guía de despliegue paso a paso (Render + Vercel + Neon, u Oracle Cloud)](docs/DEPLOY_GUIDE.md)
