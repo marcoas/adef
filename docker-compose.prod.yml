@@ -1,6 +1,6 @@
 # =============================================================
 # Producción en una sola VM (Oracle Cloud Always Free, ARM64 A1 o x86)
-# Guía: docs/DEPLOY_GUIDE.md (sección "Alternativa: Oracle Cloud")
+# Guía: docs/DEPLOY_GUIDE.md (sección 10, "Opción A: Oracle Cloud Always Free")
 #
 # Uso (en la VM, con el .env de producción en la raíz del repo):
 #   docker compose -f docker-compose.prod.yml up -d --build
@@ -77,6 +77,8 @@ services:
       PLATE_RECOGNIZER_TOKEN: ${PLATE_RECOGNIZER_TOKEN:?Definir PLATE_RECOGNIZER_TOKEN}
       PLATE_RECOGNIZER_MONTHLY_QUOTA: ${PLATE_RECOGNIZER_MONTHLY_QUOTA:-2500}
       MAX_IMAGE_SIZE_MB: ${MAX_IMAGE_SIZE_MB:-5}
+      # Vacío = 1 salto (Caddy). Ver TRUST_PROXY en .env.example
+      TRUST_PROXY: ${TRUST_PROXY:-}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       IMAGE_PROVIDER: ${IMAGE_PROVIDER:-local}
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}

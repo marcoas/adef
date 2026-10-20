@@ -1,6 +1,6 @@
 # =============================================================
 # Caddy: proxy inverso con HTTPS automático (Let's Encrypt)
-# Lo usa docker-compose.prod.yml (alternativa Oracle Cloud).
+# Lo usa docker-compose.prod.yml (opción A: Oracle Cloud Always Free).
 # Un solo dominio: frontend y API comparten origen, así que basta un registro
 # DNS y un único "Authorized JavaScript origin" en Google.
 # =============================================================

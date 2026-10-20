@@ -391,7 +391,7 @@ Valores del `.env` para producción (el resto se puede dejar como está):
 | `ADMIN_EMAILS` | Tu correo. |
 | `IMAGE_PROVIDER` | `cloudinary` (recomendado: no ocupa el disco de la VM ni entra en sus backups) o `local` (fotos en el volumen `uploads`). |
 | `CLOUDINARY_*` | Si `IMAGE_PROVIDER=cloudinary`. |
-| `TRUST_PROXY` | Vacío (vale `1`: Caddy es el único proxy delante). |
+| `TRUST_PROXY` | Vacío (vale `1`: Caddy es el único proxy delante). Cambiarlo solo si se agrega otro proxy o CDN delante de Caddy (p. ej. `2` con Cloudflare en modo proxy). |
 
 `docker-compose.prod.yml` arma solo lo demás: `NODE_ENV=production`,
 `DATABASE_URL` (apunta al servicio `postgres`), `FRONTEND_URL=https://${DOMAIN}`,
@@ -434,8 +434,14 @@ se reinicia.
    JavaScript origins*: agregar `https://album.midominio.com` (sin `/` final).
 2. `curl https://album.midominio.com/api/health` → `200` con
    `"database":"connected (PostgreSQL)"`.
-3. Seguir los pasos 2 a 5 de la [sección 9](#9-verificación-post-deploy--opción-b)
-   (login, panel de admin, escaneo, invitación).
+3. Abrir `https://album.midominio.com` → **Iniciar sesión con Google**.
+   - `origin_mismatch` / popup que se cierra: falta el origen del punto 1.
+   - `500` en `/api/auth/login`: falta `GOOGLE_CLIENT_ID` en `.env`.
+4. Con el correo de `ADMIN_EMAILS`: debe aparecer el panel de administración.
+5. Escanear una foto de una patente: la figurita se pega y la imagen se ve
+   desde `res.cloudinary.com` (con `IMAGE_PROVIDER=cloudinary`) o desde
+   `https://album.midominio.com/uploads/...` (con `local`).
+6. Invitar a un asociado: el link debe empezar con `https://album.midominio.com`.
 
 ### 10.9 Operación
 
