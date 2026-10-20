@@ -118,7 +118,13 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     try {
       const res = await apiFetch('/plates/ocr', { method: 'POST', json: { imageBase64 } });
 
-      if (!res.ok) throw new Error('Error en API de OCR');
+      if (!res.ok) {
+        // OCR no disponible (503: sin token, API caída o cuota mensual agotada):
+        // se muestra el mensaje del backend, que sugiere cargar la patente a mano.
+        const errData = await readJson(res);
+        setErrorMsg(errData.error || 'No se pudo procesar la foto con OCR. Volvé a capturar la foto o probá otra imagen.');
+        return;
+      }
 
       const data = await res.json();
       if (data.plateResult && data.plateResult.formattedPlate) {

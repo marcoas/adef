@@ -65,7 +65,7 @@ máquina de prueba x86). No se simuló la latencia de red hacia Neon.
 
 | Servicio | Límite gratuito | Impacto |
 |---|---|---|
-| **Plate Recognizer** | 2.500 lecturas/mes, 1 lectura/s | ~83 escaneos/día **en total**: es el techo real en ambas opciones. Por encima de 1/s responde error → `503` al usuario. |
+| **Plate Recognizer** | 2.500 lecturas/mes, 1 lectura/s | ~83 escaneos/día **en total**: es el techo real en ambas opciones. El backend encola las llamadas a 1/s y corta al llegar a la cuota (ver §4). |
 | **Render** | 5 GB/mes de tráfico saliente (incluye llamadas a Plate Recognizer y Cloudinary) | ~750 escaneos/mes con fotos grandes (~10.000 comprimidas). Al superarlo, sin tarjeta, suspende el servicio hasta fin de mes. |
 | **Neon** | 100 CU-hora/mes, 5 GB de tráfico | Con una pestaña abierta, el polling impide que la base se suspenda. |
 | **Cloudinary** | 25 créditos/mes | Miles de fotos. |
@@ -74,29 +74,38 @@ máquina de prueba x86). No se simuló la latencia de red hacia Neon.
 
 ---
 
-## 4. Mejoras pendientes (por impacto)
+## 4. Mejoras aplicadas (2026-10-20)
 
-1. **`app.set('trust proxy', 1)`**: sin esto, detrás de un proxy todos los
-   usuarios comparten el rate limit (20 escaneos/logins cada 15 min).
-2. **Comprimir la foto en el navegador** (1280 px, JPEG) y enviarla una sola
-   vez: ~14× menos tráfico y el doble de escaneos por minuto en Render.
-3. **`GET /album`**: reemplazar `include: { uploadedBy: true }` por un `select`
-   del nombre.
-4. **Compresión gzip** de respuestas (álbum: ~97 KB → ~15 KB).
-5. **Migraciones en build/pre-deploy** en lugar de en cada arranque.
-6. **Encolar llamadas a Plate Recognizer** a 1/s y cortar al llegar a la cuota.
+Las mejoras surgidas de la prueba de carga ya están implementadas; las cifras
+de la sección 2 se midieron **antes** de aplicarlas.
+
+| # | Mejora | Dónde |
+|---|---|---|
+| 1 | `trust proxy` configurable con `TRUST_PROXY` (por defecto `1` en producción): el rate limit usa la IP real del usuario. | `backend/src/app.ts`, `config.ts` |
+| 2 | La foto se comprime en el navegador (lado mayor ≤ 1280 px, JPEG 0,8) una sola vez y se reutiliza para el OCR y el guardado. | `frontend/src/lib/imageCompression.ts`, `UploadModal.tsx` |
+| 3 | `GET /album` trae solo el nombre de quien subió cada figurita. | `backend/src/routes/album.ts` |
+| 4 | Compresión gzip de respuestas (`compression`). | `backend/src/app.ts` |
+| 5 | Migraciones una vez por despliegue (`npm run migrate:deploy`), no al arrancar. | `render.yaml`, `docker-compose.prod.yml` |
+| 6 | Llamadas a Plate Recognizer encoladas a 1/s y corte al alcanzar `PLATE_RECOGNIZER_MONTHLY_QUOTA` (`503` con `code: OCR_QUOTA_EXCEEDED`; el modal muestra el mensaje y permite cargar la patente a mano). | `backend/src/services/alprService.ts` |
+
+**Riesgos conocidos:**
+- La cola de 1/s es por proceso: con varias instancias del backend cada una
+  tendría su propio límite.
+- Con solicitudes simultáneas justo en el límite, la cuota se puede exceder
+  por unas pocas llamadas.
+- `TRUST_PROXY=1` supone un único proxy delante (Caddy en Oracle; el balanceador
+  en Render). Si se agrega otro (p. ej. Cloudflare), subir el valor.
+- Fotos a 1280 px: si la patente sale muy chica (foto lejana), la lectura puede
+  empeorar levemente.
 
 ---
 
-## 5. Preparación pendiente para producción
+## 5. Preparación para producción
 
-- `backend/Dockerfile` arranca con `npm run dev`: pasar a `npm run build` +
-  `npx prisma migrate deploy` + `npm start` con `NODE_ENV=production`.
-- Variables: `JWT_SECRET` nuevo, `FRONTEND_URL` (CORS), `NEXT_PUBLIC_API_URL`,
-  `IMAGE_PROVIDER=cloudinary` con credenciales reales, `DATABASE_URL` de Neon
-  con `?sslmode=require`, `PLATE_RECOGNIZER_TOKEN` (obligatorio).
-- Google Cloud Console: agregar el dominio público a *Authorized JavaScript
-  origins*.
+Resuelta: ver la guía paso a paso en **[DEPLOY_GUIDE.md](DEPLOY_GUIDE.md)**
+(`render.yaml`, `frontend/vercel.json`, `backend/Dockerfile` multi-stage,
+`docker-compose.prod.yml` + `Caddyfile` para Oracle, variables por servicio y
+Google OAuth).
 
 ---
 
